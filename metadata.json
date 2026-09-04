@@ -1,0 +1,8 @@
+{
+  "name": "Filmora",
+  "description": "E-marketplace for former and buyers",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
