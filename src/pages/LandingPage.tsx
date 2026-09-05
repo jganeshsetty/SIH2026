@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
@@ -13,16 +13,29 @@ import {
   DollarSign, 
   Navigation, 
   ChevronRight,
-  Sparkles
+  Sparkles,
+  LogOut,
+  User,
+  Loader2
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setRole } = useAuth();
+  const { user, appUser, signInWithGoogle, logout } = useAuth();
+  const [signingInRole, setSigningInRole] = useState<'farmer' | 'buyer' | 'transporter' | null>(null);
 
-  const handleRoleSelect = (role: 'farmer' | 'buyer' | 'transporter') => {
-    setRole(role);
-    navigate(`/${role}`);
+  const handleRoleSelect = async (role: 'farmer' | 'buyer' | 'transporter') => {
+    setSigningInRole(role);
+    try {
+      if (!user) {
+        await signInWithGoogle(role);
+      }
+      navigate(`/${role}`);
+    } catch (err: any) {
+      console.error('Google Sign-In failed:', err);
+    } finally {
+      setSigningInRole(null);
+    }
   };
 
   return (
@@ -72,13 +85,41 @@ export const LandingPage: React.FC = () => {
             <a href="#contact" className="hover:text-[#10b981] transition-colors">Contact</a>
           </nav>
 
-          {/* Transportation Portal Shortcut */}
+          {/* User Profile / Portal Buttons */}
           <div className="flex items-center gap-3">
+            {user ? (
+              <div className="flex items-center gap-3 bg-white/90 px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-sm">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || 'User'} className="w-8 h-8 rounded-full border border-[#10b981]" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold">
+                    {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="hidden sm:block text-left">
+                  <span className="block text-xs font-extrabold text-[#022c22] leading-tight truncate max-w-[120px]">{user.displayName || user.email}</span>
+                  <span className="text-[10px] font-bold text-[#10b981] uppercase tracking-wider">{appUser?.role || 'User'}</span>
+                </div>
+                <button
+                  onClick={() => logout()}
+                  title="Sign Out"
+                  className="p-1.5 rounded-xl text-[#065f46] hover:bg-red-50 hover:text-red-600 transition-colors ml-1"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : null}
+
             <button 
               onClick={() => handleRoleSelect('transporter')}
+              disabled={!!signingInRole}
               className="px-4 py-2.5 rounded-2xl text-xs font-extrabold text-[#065f46] bg-white/80 hover:bg-[#e1f2e6] border-1.5 border-[#10b981]/40 backdrop-blur-xl transition-all flex items-center gap-2 shadow-sm shadow-[#10b981]/10 hover:border-[#10b981]/70 hover:scale-102"
             >
-              <Truck className="w-4 h-4 text-[#10b981]" />
+              {signingInRole === 'transporter' ? (
+                <Loader2 className="w-4 h-4 text-[#10b981] animate-spin" />
+              ) : (
+                <Truck className="w-4 h-4 text-[#10b981]" />
+              )}
               <span>Transporter Hub</span>
             </button>
           </div>
@@ -120,15 +161,16 @@ export const LandingPage: React.FC = () => {
             {/* Farmer Glass Button */}
             <button
               onClick={() => handleRoleSelect('farmer')}
-              className="group w-full sm:w-1/2 p-5 rounded-3xl bg-white/85 hover:bg-white/95 backdrop-blur-2xl border-1.5 border-[#10b981]/45 shadow-xl shadow-[#10b981]/15 hover:shadow-2xl hover:shadow-[#10b981]/30 hover:border-[#10b981]/70 transition-all duration-300 flex items-center justify-between text-left hover:-translate-y-1"
+              disabled={!!signingInRole}
+              className="group w-full sm:w-1/2 p-5 rounded-3xl bg-white/85 hover:bg-white/95 backdrop-blur-2xl border-1.5 border-[#10b981]/45 shadow-xl shadow-[#10b981]/15 hover:shadow-2xl hover:shadow-[#10b981]/30 hover:border-[#10b981]/70 transition-all duration-300 flex items-center justify-between text-left hover:-translate-y-1 disabled:opacity-75"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30 group-hover:bg-[#10b981] group-hover:text-white text-[#065f46] flex items-center justify-center transition-all shadow-sm">
-                  <Sprout className="w-6 h-6" />
+                  {signingInRole === 'farmer' ? <Loader2 className="w-6 h-6 animate-spin text-[#10b981]" /> : <Sprout className="w-6 h-6" />}
                 </div>
                 <div>
                   <span className="block text-[10px] font-black text-[#10b981] uppercase tracking-widest">PRODUCER</span>
-                  <span className="text-base font-black text-[#022c22]">I'M A FARMER</span>
+                  <span className="text-base font-black text-[#022c22]">{signingInRole === 'farmer' ? 'SIGNING IN...' : "I'M A FARMER"}</span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-[#10b981] group-hover:translate-x-1 transition-transform" />
@@ -137,15 +179,16 @@ export const LandingPage: React.FC = () => {
             {/* Buyer Glass Button */}
             <button
               onClick={() => handleRoleSelect('buyer')}
-              className="group w-full sm:w-1/2 p-5 rounded-3xl bg-white/85 hover:bg-white/95 backdrop-blur-2xl border-1.5 border-[#10b981]/45 shadow-xl shadow-[#10b981]/15 hover:shadow-2xl hover:shadow-[#10b981]/30 hover:border-[#10b981]/70 transition-all duration-300 flex items-center justify-between text-left hover:-translate-y-1"
+              disabled={!!signingInRole}
+              className="group w-full sm:w-1/2 p-5 rounded-3xl bg-white/85 hover:bg-white/95 backdrop-blur-2xl border-1.5 border-[#10b981]/45 shadow-xl shadow-[#10b981]/15 hover:shadow-2xl hover:shadow-[#10b981]/30 hover:border-[#10b981]/70 transition-all duration-300 flex items-center justify-between text-left hover:-translate-y-1 disabled:opacity-75"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30 group-hover:bg-[#10b981] group-hover:text-white text-[#065f46] flex items-center justify-center transition-all shadow-sm">
-                  <ShoppingBag className="w-6 h-6" />
+                  {signingInRole === 'buyer' ? <Loader2 className="w-6 h-6 animate-spin text-[#10b981]" /> : <ShoppingBag className="w-6 h-6" />}
                 </div>
                 <div>
                   <span className="block text-[10px] font-black text-[#10b981] uppercase tracking-widest">PURCHASER</span>
-                  <span className="text-base font-black text-[#022c22]">I'M A BUYER</span>
+                  <span className="text-base font-black text-[#022c22]">{signingInRole === 'buyer' ? 'SIGNING IN...' : "I'M A BUYER"}</span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-[#10b981] group-hover:translate-x-1 transition-transform" />

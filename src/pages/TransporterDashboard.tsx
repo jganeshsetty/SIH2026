@@ -8,7 +8,8 @@ import {
   ArrowLeft, 
   Navigation, 
   Play, 
-  Package
+  Package,
+  LogOut
 } from 'lucide-react';
 import { LiveTrackingMap } from '../components/LiveTrackingMap.tsx';
 import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
@@ -27,7 +28,7 @@ interface DeliveryRequest {
 
 export const TransporterDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { appUser } = useAuth();
+  const { user, appUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'available' | 'active'>('available');
 
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([
@@ -106,6 +107,26 @@ export const TransporterDashboard: React.FC = () => {
               <span className="text-xs font-black text-[#10b981] uppercase tracking-widest block">FREIGHT DISPATCH</span>
               <h1 className="text-3xl font-black text-[#022c22]">Transportation Hub</h1>
             </div>
+
+            {user ? (
+              <div className="flex items-center gap-2 bg-white/90 px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-sm ml-2">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || 'User'} className="w-7 h-7 rounded-full border border-[#10b981]" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold">
+                    {(user.displayName || user.email || 'T')[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="text-xs font-bold text-[#022c22] max-w-[100px] truncate">{user.displayName || user.email}</span>
+                <button
+                  onClick={() => { logout(); navigate('/'); }}
+                  title="Sign Out"
+                  className="p-1 rounded-lg text-[#065f46] hover:bg-red-50 hover:text-red-600 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {/* Switcher */}
