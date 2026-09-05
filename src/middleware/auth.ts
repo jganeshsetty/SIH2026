@@ -26,10 +26,14 @@ export const requireAuth = async (
     const decodedToken = await adminAuth.verifyIdToken(token);
     req.user = decodedToken;
     
-    // Also fetch the database user to attach the role
-    const dbUsers = await db.select().from(users).where(eq(users.uid, decodedToken.uid));
-    if (dbUsers.length > 0) {
-      req.dbUser = dbUsers[0];
+    // Also fetch the database user to attach the role if available
+    try {
+      const dbUsers = await db.select().from(users).where(eq(users.uid, decodedToken.uid));
+      if (dbUsers.length > 0) {
+        req.dbUser = dbUsers[0];
+      }
+    } catch (dbErr) {
+      console.warn('Database user fetch fallback, using Firebase auth token data.');
     }
 
     next();

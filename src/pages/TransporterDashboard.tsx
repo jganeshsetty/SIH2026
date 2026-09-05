@@ -34,23 +34,12 @@ export const TransporterDashboard: React.FC = () => {
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([
     {
       id: 701,
-      cropName: 'Organic Wheat',
-      quantity: 500,
+      cropName: 'Tomato (Grade A Fresh)',
+      quantity: 5000,
       unit: 'kg',
-      farmerLocation: 'Green Acres Farm, Willamette Valley, OR',
-      buyerLocation: 'Wholesale Depot Hub #4, Seattle, WA',
-      distanceKm: 175,
-      status: 'ACCEPTED',
-      isAccepted: false
-    },
-    {
-      id: 702,
-      cropName: 'Vine-Ripened Tomatoes',
-      quantity: 1200,
-      unit: 'kg',
-      farmerLocation: 'Valley Organics, Fresno, CA',
-      buyerLocation: 'Bay Area Fresh Market Depot, Oakland, CA',
-      distanceKm: 210,
+      farmerLocation: 'Central Agro Zone, Nashik, Maharashtra',
+      buyerLocation: 'Mumbai Central Agro Depot, Maharashtra',
+      distanceKm: 165,
       status: 'ACCEPTED',
       isAccepted: false
     }

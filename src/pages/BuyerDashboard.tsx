@@ -14,10 +14,20 @@ import {
   ChevronRight,
   Check,
   X,
-  LogOut
+  LogOut,
+  PlusCircle,
+  Target,
+  BarChart3,
+  Layers,
+  Award
 } from 'lucide-react';
 import { LiveTrackingMap } from '../components/LiveTrackingMap.tsx';
 import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
+import { BuyerTrustBadge } from '../components/BuyerTrustBadge.tsx';
+import { SmartMatchingWidget } from '../components/SmartMatchingWidget.tsx';
+import { EcosystemMapView } from '../components/EcosystemMapView.tsx';
+import { BENCHMARK_BUYER_DEMANDS } from '../services/marketData.ts';
+import { BuyerDemand, Crop as AppCrop } from '../types.ts';
 
 interface AvailableCrop {
   id: number;
@@ -30,6 +40,7 @@ interface AvailableCrop {
   description: string;
   imageUrl: string;
   status?: 'AVAILABLE' | 'ACCEPTED' | 'ORDER_CONFIRMED';
+  quality?: string;
 }
 
 interface BuyerOrder {
@@ -49,59 +60,53 @@ interface BuyerOrder {
 const INITIAL_CROPS: AvailableCrop[] = [
   {
     id: 1,
-    name: 'Organic Wheat',
-    farmerName: 'John Green (Green Acres)',
-    farmerLocation: 'Willamette Valley, Oregon',
-    quantity: 500,
+    name: 'Tomato',
+    farmerName: 'Ganesh (Farmer)',
+    farmerLocation: 'Nashik, Maharashtra',
+    quantity: 5000,
     unit: 'kg',
-    pricePerUnit: 15,
-    description: 'Single-estate organic golden wheat. Certified non-GMO.',
-    imageUrl: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=500&q=80'
-  },
-  {
-    id: 2,
-    name: 'Fresh Harvest Tomatoes',
-    farmerName: 'Maria Silva (Valley Organics)',
-    farmerLocation: 'Central Valley, California',
-    quantity: 1200,
-    unit: 'kg',
-    pricePerUnit: 4,
-    description: 'Vine-ripened roma tomatoes ready for immediate wholesale dispatch.',
-    imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80'
-  },
-  {
-    id: 3,
-    name: 'Sweet Yellow Corn',
-    farmerName: 'Robert Vance (Vance Farms)',
-    farmerLocation: 'Des Moines, Iowa',
-    quantity: 800,
-    unit: 'kg',
-    pricePerUnit: 6,
-    description: 'High-grade sweet corn, harvested at peak sweetness.',
-    imageUrl: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=500&q=80'
+    pricePerUnit: 32,
+    description: 'Fresh field-picked hybrid tomatoes, Grade A sorted for wholesale procurement.',
+    imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80',
+    quality: 'Grade A Fresh'
   }
 ];
 
 const INITIAL_ORDERS: BuyerOrder[] = [
   {
     id: 501,
-    cropName: 'Organic Wheat',
-    farmerName: 'John Green (Green Acres)',
-    farmerLocation: 'Willamette Valley, Oregon',
-    quantity: 500,
-    totalPrice: 7500,
+    cropName: 'Tomato',
+    farmerName: 'Ganesh (Farmer)',
+    farmerLocation: 'Nashik, Maharashtra',
+    quantity: 5000,
+    totalPrice: 160000,
     status: 'IN_TRANSIT',
-    transporterName: 'Express Highway Logistics (Driver: Mark)',
-    currentLocation: 'Highway 101 North - Mile 88',
-    estimatedArrival: 'Today, 4:30 PM',
-    buyerDestination: 'Wholesale Depot Hub #4, Seattle'
+    transporterName: 'Kisan Express Logistics (Driver: Ramesh Shinde)',
+    currentLocation: 'Mumbai-Nashik Express Highway - Mile 42',
+    estimatedArrival: 'Today, 5:30 PM',
+    buyerDestination: 'Mumbai Central Agro Depot, Maharashtra'
   }
 ];
 
 export const BuyerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, appUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'available-crops' | 'my-orders' | 'live-tracking'>('available-crops');
+  const [activeTab, setActiveTab] = useState<'available-crops' | 'post-demand' | 'my-demands' | 'my-orders' | 'live-tracking' | 'map'>('available-crops');
+
+  // Demands state
+  const [demands, setDemands] = useState<BuyerDemand[]>(BENCHMARK_BUYER_DEMANDS);
+
+  // Form State for posting buyer demand
+  const [cropName, setCropName] = useState('Tomato');
+  const [variety, setVariety] = useState('Hybrid Grade A');
+  const [quantity, setQuantity] = useState('5000');
+  const [unit, setUnit] = useState('kg');
+  const [requiredGrade, setRequiredGrade] = useState('Grade A Fresh');
+  const [minPrice, setMinPrice] = useState('30');
+  const [maxPrice, setMaxPrice] = useState('35');
+  const [deliveryLocation, setDeliveryLocation] = useState('Mumbai Central Agro Depot, Maharashtra');
+  const [requiredByDate, setRequiredByDate] = useState('2026-09-15');
+  const [toastMsg, setToastMsg] = useState('');
 
   // Persistent crops list
   const [crops, setCrops] = useState<AvailableCrop[]>(() => {
@@ -112,16 +117,6 @@ export const BuyerDashboard: React.FC = () => {
     return INITIAL_CROPS;
   });
 
-  // Accepted crop IDs
-  const [acceptedCropIds, setAcceptedCropIds] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem('farmora_accepted_crops');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [];
-  });
-
-  // Persistent Orders for Buyer
   const [myOrders, setMyOrders] = useState<BuyerOrder[]>(() => {
     try {
       const saved = localStorage.getItem('farmora_buyer_orders');
@@ -130,98 +125,70 @@ export const BuyerDashboard: React.FC = () => {
     return INITIAL_ORDERS;
   });
 
-  // Modal & Payment State
   const [selectedCrop, setSelectedCrop] = useState<AvailableCrop | null>(null);
-  const [paymentStep, setPaymentStep] = useState<'review' | 'payment' | 'success'>('review');
-  const [trackingOrder, setTrackingOrder] = useState<BuyerOrder | null>(null);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [paymentStep, setPaymentStep] = useState<'review' | 'escrow' | 'success'>('review');
 
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('farmora_crops', JSON.stringify(crops));
-    } catch (e) {}
-  }, [crops]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('farmora_buyer_orders', JSON.stringify(myOrders));
-    } catch (e) {}
-  }, [myOrders]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('farmora_accepted_crops', JSON.stringify(acceptedCropIds));
-    } catch (e) {}
-  }, [acceptedCropIds]);
-
-  // Core function to accept farmer offer and create order
-  const processAcceptFarmerOffer = (cropToAccept: AvailableCrop): BuyerOrder => {
-    const newOrder: BuyerOrder = {
+  const handlePostDemand = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newDemand: BuyerDemand = {
       id: Date.now(),
-      cropName: cropToAccept.name,
-      farmerName: cropToAccept.farmerName,
-      farmerLocation: cropToAccept.farmerLocation,
-      quantity: cropToAccept.quantity,
-      totalPrice: cropToAccept.quantity * cropToAccept.pricePerUnit,
-      status: 'ORDER_CONFIRMED',
-      transporterName: 'Express Highway Logistics',
-      currentLocation: cropToAccept.farmerLocation,
-      estimatedArrival: 'Tomorrow, 11:00 AM',
-      buyerDestination: 'Primary Distribution Center'
+      buyerId: appUser?.id || 2,
+      buyerName: appUser?.name || 'Reliance Fresh Agro Procurement',
+      cropName,
+      variety,
+      requiredQuantity: parseFloat(quantity) || 10000,
+      unit,
+      requiredGrade,
+      targetMinPrice: parseFloat(minPrice) || 28,
+      targetMaxPrice: parseFloat(maxPrice) || 34,
+      deliveryLocation,
+      lat: 19.0760,
+      lng: 73.0048,
+      requiredByDate: requiredByDate || '2026-09-25',
+      status: 'OPEN',
+      createdAt: new Date().toISOString().split('T')[0]
     };
 
-    // Update orders list
+    setDemands([newDemand, ...demands]);
+    setToastMsg('Buyer Demand Posted! Smart Matching enabled for Farmers & FPOs.');
+    setTimeout(() => {
+      setToastMsg('');
+      setActiveTab('my-demands');
+    }, 1500);
+  };
+
+  const processAcceptFarmerOffer = (crop: AvailableCrop) => {
+    const totalPrice = crop.quantity * crop.pricePerUnit;
+    const newOrder: BuyerOrder = {
+      id: Date.now(),
+      cropName: crop.name,
+      farmerName: crop.farmerName,
+      farmerLocation: crop.farmerLocation,
+      quantity: crop.quantity,
+      totalPrice,
+      status: 'ORDER_CONFIRMED',
+      transporterName: 'Express Freight Driver Mark',
+      currentLocation: 'Farmer Hub Dispatch Point',
+      estimatedArrival: 'Tomorrow, 2:00 PM',
+      buyerDestination: 'Wholesale Depot Hub, Mumbai'
+    };
+
     const updatedOrders = [newOrder, ...myOrders];
     setMyOrders(updatedOrders);
-
-    // Track accepted IDs
-    const updatedAcceptedIds = [...acceptedCropIds, cropToAccept.id];
-    setAcceptedCropIds(updatedAcceptedIds);
-
-    // Mark crop status as ACCEPTED
-    setCrops(prevCrops => 
-      prevCrops.map(c => c.id === cropToAccept.id ? { ...c, status: 'ACCEPTED' } : c)
-    );
-
-    // Show toast message
-    setToastMsg(`Farmer Offer for "${cropToAccept.name}" Accepted Successfully! Order created & Escrow locked.`);
-    setTimeout(() => setToastMsg(null), 4000);
+    try {
+      localStorage.setItem('farmora_buyer_orders', JSON.stringify(updatedOrders));
+    } catch (e) {}
 
     return newOrder;
   };
 
-  const handleDirectAcceptOffer = (crop: AvailableCrop) => {
-    const newOrder = processAcceptFarmerOffer(crop);
-    setTrackingOrder(newOrder);
-  };
-
-  const handleAcceptOfferModalNext = () => {
-    setPaymentStep('payment');
-  };
-
-  const handleMakePaymentModal = () => {
-    if (!selectedCrop) return;
-    const newOrder = processAcceptFarmerOffer(selectedCrop);
-    setPaymentStep('success');
-
-    setTimeout(() => {
-      setSelectedCrop(null);
-      setPaymentStep('review');
-      setActiveTab('live-tracking');
-      setTrackingOrder(newOrder);
-    }, 1800);
-  };
-
-  const activeTracking = trackingOrder || (myOrders.length > 0 ? myOrders[0] : null);
-
   return (
-    <div className="relative min-h-screen bg-[#f6faf6] text-[#101e17] pt-6 pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#f6faf6] text-[#101e17] pt-6 pb-24 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
       
       {/* 3D Botanical Parallax Background */}
       <BotanicalParallaxBackground />
 
-      {/* Global Toast Notification */}
+      {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 bg-[#065f46] text-white px-6 py-4 rounded-2xl shadow-2xl border border-[#10b981]/50 flex items-center gap-3 animate-bounce">
           <CheckCircle2 className="w-6 h-6 text-[#10b981]" />
@@ -229,10 +196,10 @@ export const BuyerDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="relative z-20 max-w-6xl mx-auto">
+      <div className="relative z-20 max-w-7xl mx-auto">
 
-        {/* Navigation & Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#10b981]/30">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#10b981]/30">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/')} 
@@ -241,8 +208,8 @@ export const BuyerDashboard: React.FC = () => {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <span className="text-xs font-black text-[#10b981] uppercase tracking-widest block">WHOLESALE PURCHASER</span>
-              <h1 className="text-3xl font-black text-[#022c22]">Buyer Dashboard</h1>
+              <span className="text-xs font-black text-[#10b981] uppercase tracking-widest block">WHOLESALE PROCUREMENT</span>
+              <h1 className="text-3xl font-black text-[#022c22]">Buyer Procurement Hub</h1>
             </div>
 
             {user ? (
@@ -267,362 +234,284 @@ export const BuyerDashboard: React.FC = () => {
           </div>
 
           {/* Tab Switcher */}
-          <div className="flex items-center gap-2 bg-white/85 backdrop-blur-xl p-1.5 rounded-2xl border-1.5 border-[#10b981]/35 shadow-md">
+          <div className="flex flex-wrap items-center gap-2 bg-white/85 backdrop-blur-xl p-1.5 rounded-2xl border-1.5 border-[#10b981]/35 shadow-md text-xs font-extrabold">
             <button
               onClick={() => setActiveTab('available-crops')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-                activeTab === 'available-crops' 
-                  ? 'bg-[#065f46] text-white shadow-md' 
-                  : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'available-crops' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>1. FARMER OFFERS ({crops.length})</span>
+              <span>Available Produce</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('post-demand')}
+              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'post-demand' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              }`}
+            >
+              <PlusCircle className="w-4 h-4 text-[#10b981]" />
+              <span>Post Crop Demand</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('my-demands')}
+              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'my-demands' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              }`}
+            >
+              <Target className="w-4 h-4" />
+              <span>Active Demands ({demands.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('my-orders')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-                activeTab === 'my-orders' 
-                  ? 'bg-[#065f46] text-white shadow-md' 
-                  : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'my-orders' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
               }`}
             >
               <Package className="w-4 h-4" />
-              <span>2. MY ORDERS ({myOrders.length})</span>
+              <span>Orders ({myOrders.length})</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('live-tracking')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
-                activeTab === 'live-tracking' 
-                  ? 'bg-[#065f46] text-white shadow-md' 
-                  : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              onClick={() => setActiveTab('map')}
+              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'map' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
               }`}
             >
-              <Navigation className="w-4 h-4" />
-              <span>3. LIVE TRACKING</span>
+              <Layers className="w-4 h-4" />
+              <span>Map View</span>
             </button>
           </div>
         </div>
 
-        {/* SECTION 1: AVAILABLE CROPS & FARMER OFFERS */}
+        {/* Buyer Trust Profile Banner */}
+        <div className="mb-6">
+          <BuyerTrustBadge buyerId={appUser?.id || 2} buyerName={appUser?.name} />
+        </div>
+
+        {/* TAB 1: AVAILABLE CROPS */}
         {activeTab === 'available-crops' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-black text-[#022c22]">Farmer Offers & Listings</h2>
-                <p className="text-xs text-[#065f46] font-semibold">Review farmer prices and click "Accept Offer" to lock escrow and start dispatch.</p>
-              </div>
-              <span className="text-xs font-bold text-[#065f46] bg-[#e1f2e6] px-3 py-1 rounded-full border border-[#10b981]/30 shrink-0">
-                {crops.length} Offer(s) Available
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {crops.map(crop => {
-                const isAccepted = acceptedCropIds.includes(crop.id) || crop.status === 'ACCEPTED';
-                const totalPrice = crop.quantity * crop.pricePerUnit;
-
-                return (
-                  <div key={crop.id} className="rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 overflow-hidden shadow-lg hover:shadow-2xl hover:border-[#10b981]/60 transition-all duration-300 flex flex-col justify-between">
-                    <div>
-                      <div className="h-48 relative overflow-hidden bg-gray-100">
-                        <img 
-                          src={crop.imageUrl} 
-                          alt={crop.name}
-                          className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500" 
-                        />
-                        <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-[#065f46] font-black text-xs shadow-md border border-[#10b981]/30">
-                          ${crop.pricePerUnit} / {crop.unit}
-                        </div>
-                        {isAccepted && (
-                          <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-[#10b981] text-white font-black text-xs shadow-md border border-white/40 flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>ACCEPTED</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-6 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-black text-lg text-[#022c22]">{crop.name}</h3>
-                          <span className="text-xs font-black text-[#10b981] bg-[#e1f2e6] px-2.5 py-0.5 rounded-md border border-[#10b981]/30">
-                            ${totalPrice} Total
-                          </span>
-                        </div>
-
-                        <div className="text-xs font-semibold text-[#065f46]/90 space-y-1">
-                          <p className="flex items-center gap-1.5">
-                            <span className="text-[#065f46]/70">Farmer:</span>
-                            <strong className="text-[#022c22]">{crop.farmerName}</strong>
-                          </p>
-                          <p className="flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-[#10b981]" />
-                            <span>{crop.farmerLocation}</span>
-                          </p>
-                          <p className="flex items-center gap-1.5">
-                            <span className="text-[#065f46]/70">Available Lot:</span>
-                            <strong className="text-[#10b981]">{crop.quantity} {crop.unit}</strong>
-                          </p>
-                        </div>
-
-                        <p className="text-xs text-gray-600 font-medium line-clamp-2">{crop.description}</p>
-                      </div>
-                    </div>
-
-                    <div className="p-6 pt-0 space-y-2">
-                      {isAccepted ? (
-                        <button
-                          onClick={() => {
-                            setActiveTab('live-tracking');
-                          }}
-                          className="w-full py-3.5 rounded-2xl bg-[#e1f2e6] text-[#065f46] font-black text-xs shadow-sm transition-all flex items-center justify-center gap-2 border border-[#10b981]/40"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
-                          <span>OFFER ACCEPTED • TRACK ORDER</span>
-                        </button>
-                      ) : (
-                        <div className="flex flex-col sm:flex-row items-center gap-2">
-                          <button
-                            onClick={() => handleDirectAcceptOffer(crop)}
-                            className="w-full py-3 rounded-2xl bg-[#10b981] hover:bg-[#047857] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 border border-white/30"
-                          >
-                            <Check className="w-4 h-4" />
-                            <span>ACCEPT OFFER</span>
-                          </button>
-                          
-                          <button
-                            onClick={() => {
-                              setSelectedCrop(crop);
-                              setPaymentStep('review');
-                            }}
-                            className="w-full sm:w-auto px-4 py-3 rounded-2xl bg-white/90 hover:bg-[#e1f2e6] text-[#065f46] font-black text-xs shadow-sm transition-all flex items-center justify-center gap-1 border border-[#10b981]/40 shrink-0"
-                          >
-                            <span>DETAILS</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {crops.map((crop) => (
+              <div key={crop.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col justify-between space-y-4">
+                <div className="flex gap-4">
+                  <img src={crop.imageUrl} alt={crop.name} className="w-24 h-24 rounded-2xl object-cover border border-[#10b981]/30" />
+                  <div>
+                    <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                      {crop.quality || 'Grade A'}
+                    </span>
+                    <h3 className="text-lg font-black text-[#022c22] mt-1">{crop.name}</h3>
+                    <p className="text-xs text-[#065f46] font-semibold">{crop.farmerName} • {crop.farmerLocation}</p>
+                    <div className="mt-2 text-xs font-black text-[#022c22]">
+                      {crop.quantity.toLocaleString('en-IN')} {crop.unit} @ ₹{crop.pricePerUnit}/unit
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* MODAL: ACCEPT OFFER & PAYMENT SCREEN */}
-        {selectedCrop && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-white/95 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border-1.5 border-[#10b981]/40 space-y-6">
-              
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-[#10b981]/20 pb-4">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag className="w-5 h-5 text-[#10b981]" />
-                  <h3 className="font-black text-lg text-[#022c22]">
-                    {paymentStep === 'review' && 'Accept Farmer Offer'}
-                    {paymentStep === 'payment' && 'Escrow Payment'}
-                    {paymentStep === 'success' && 'Order Confirmed!'}
-                  </h3>
                 </div>
-                <button 
-                  onClick={() => setSelectedCrop(null)}
-                  className="p-1 rounded-lg hover:bg-gray-100 text-gray-500"
+
+                <button
+                  onClick={() => { setSelectedCrop(crop); setPaymentStep('review'); }}
+                  className="w-full py-3 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-md"
                 >
-                  <X className="w-5 h-5" />
+                  <CreditCard className="w-4 h-4" />
+                  <span>Buy Direct & Lock Escrow (₹{(crop.quantity * crop.pricePerUnit).toLocaleString('en-IN')})</span>
                 </button>
               </div>
-
-              {/* STEP 1: REVIEW OFFER */}
-              {paymentStep === 'review' && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-[#e1f2e6]/70 border border-[#10b981]/30 space-y-2 text-sm text-[#065f46]">
-                    <div className="flex justify-between">
-                      <span className="text-xs text-[#065f46]/70 uppercase font-bold">Crop</span>
-                      <strong className="text-[#022c22]">{selectedCrop.name}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-xs text-[#065f46]/70 uppercase font-bold">Farmer</span>
-                      <strong>{selectedCrop.farmerName}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-xs text-[#065f46]/70 uppercase font-bold">Origin Location</span>
-                      <span>{selectedCrop.farmerLocation}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-xs text-[#065f46]/70 uppercase font-bold">Quantity</span>
-                      <strong>{selectedCrop.quantity} {selectedCrop.unit}</strong>
-                    </div>
-                    <div className="flex justify-between border-t border-[#10b981]/20 pt-2 text-base">
-                      <span className="font-black text-[#022c22]">Total Agreed Price</span>
-                      <strong className="text-[#10b981]">${selectedCrop.quantity * selectedCrop.pricePerUnit}</strong>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Funds will be placed in secure escrow and released upon delivery receipt.</span>
-                  </div>
-
-                  <button
-                    onClick={handleAcceptOfferModalNext}
-                    className="w-full py-4 rounded-2xl bg-[#065f46] hover:bg-[#047857] text-white font-black text-sm shadow-xl shadow-[#065f46]/20 transition-all flex items-center justify-center gap-2 border border-[#10b981]/40"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>ACCEPT OFFER & PROCEED TO ESCROW</span>
-                  </button>
-                </div>
-              )}
-
-              {/* STEP 2: PAYMENT */}
-              {paymentStep === 'payment' && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-xs space-y-3">
-                    <div className="flex justify-between font-black text-sm text-[#022c22]">
-                      <span>Amount Due:</span>
-                      <span className="text-[#10b981]">${selectedCrop.quantity * selectedCrop.pricePerUnit}</span>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-extrabold uppercase text-gray-500 mb-1">Select Payment Method</label>
-                      <select className="w-full p-2.5 rounded-xl border border-gray-300 text-xs font-bold text-[#022c22] outline-none">
-                        <option>Direct Bank Escrow Transfer</option>
-                        <option>Corporate Line of Credit</option>
-                        <option>Instant Digital Wire</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-extrabold uppercase text-gray-500 mb-1">Reference Account ID</label>
-                      <input 
-                        type="text" 
-                        defaultValue="ESCROW-BUYER-88492"
-                        className="w-full p-2.5 rounded-xl border border-gray-300 text-xs font-mono font-bold text-[#022c22] outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleMakePaymentModal}
-                    className="w-full py-4 rounded-2xl bg-[#10b981] hover:bg-[#047857] text-white font-black text-sm shadow-xl shadow-[#10b981]/20 transition-all flex items-center justify-center gap-2"
-                  >
-                    <CreditCard className="w-5 h-5" />
-                    <span>CONFIRM ACCEPTANCE & PAY</span>
-                  </button>
-                </div>
-              )}
-
-              {/* STEP 3: SUCCESS */}
-              {paymentStep === 'success' && (
-                <div className="py-8 text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-[#e1f2e6] text-[#10b981] flex items-center justify-center mx-auto border border-[#10b981]/40">
-                    <CheckCircle2 className="w-10 h-10" />
-                  </div>
-                  <h4 className="text-xl font-black text-[#022c22]">Offer Accepted & Paid!</h4>
-                  <p className="text-xs text-[#065f46] font-bold">Order created & dispatched to highway transporter network.</p>
-                </div>
-              )}
-
-            </div>
+            ))}
           </div>
         )}
 
-        {/* SECTION 2: MY ORDERS */}
-        {activeTab === 'my-orders' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-[#022c22]">Purchased Orders</h2>
-              <span className="text-xs font-bold text-[#065f46] bg-[#e1f2e6] px-3 py-1 rounded-full border border-[#10b981]/30">
-                {myOrders.length} Order(s)
-              </span>
+        {/* TAB 2: POST CROP DEMAND */}
+        {activeTab === 'post-demand' && (
+          <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border-1.5 border-[#10b981]/35 shadow-2xl space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-[#10b981]/20">
+              <div className="w-11 h-11 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30 flex items-center justify-center text-[#065f46]">
+                <Target className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-[#022c22]">Post Bulk Crop Requirement</h2>
+                <p className="text-xs text-[#065f46] font-semibold">Broadcast grade specs to regional Farmers & FPOs with smart matching.</p>
+              </div>
             </div>
 
-            {myOrders.map(ord => (
-              <div key={ord.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-[#10b981] uppercase tracking-wider">ORDER #{ord.id}</span>
-                  <h3 className="text-lg font-black text-[#022c22]">{ord.cropName} ({ord.quantity} kg)</h3>
-                  <p className="text-xs text-[#065f46]/90 font-semibold">Farmer: <strong>{ord.farmerName}</strong></p>
-                  <p className="text-xs text-[#10b981] font-black">Total Paid: ${ord.totalPrice}</p>
+            <form onSubmit={handlePostDemand} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Crop Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={cropName}
+                    onChange={(e) => setCropName(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
+                  />
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-full bg-[#e1f2e6] text-[#065f46] text-xs font-black border border-[#10b981]/30">
-                    {ord.status}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setTrackingOrder(ord);
-                      setActiveTab('live-tracking');
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-[#065f46] hover:bg-[#047857] text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-md border border-[#10b981]/30"
+                <div>
+                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Required Grade / Quality *</label>
+                  <select
+                    value={requiredGrade}
+                    onChange={(e) => setRequiredGrade(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
                   >
-                    <Navigation className="w-4 h-4" />
-                    <span>TRACK LIVE</span>
-                  </button>
+                    <option value="Grade A Premium">Grade A Premium</option>
+                    <option value="Grade A Organic">Grade A Organic</option>
+                    <option value="Export Grade (55mm+)">Export Grade (55mm+)</option>
+                    <option value="Standard Grade B">Standard Grade B</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Quantity (kg) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Target Min Price (₹/kg)</label>
+                  <input
+                    type="number"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Target Max Price (₹/kg)</label>
+                  <input
+                    type="number"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-[#022c22] mb-1">Delivery Destination Hub</label>
+                <input
+                  type="text"
+                  value={deliveryLocation}
+                  onChange={(e) => setDeliveryLocation(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-4 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-lg flex items-center justify-center gap-2"
+              >
+                <Target className="w-5 h-5" />
+                <span>Post Demand & Enable Smart Farmer Matching</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 3: ACTIVE DEMANDS */}
+        {activeTab === 'my-demands' && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-black text-[#022c22]">Active Buyer Demands & Matches</h2>
+            {demands.map((demand) => (
+              <div key={demand.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div>
+                  <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                    DEMAND #{demand.id} • {demand.status}
+                  </span>
+                  <h3 className="text-lg font-black text-[#022c22] mt-1">{demand.cropName} ({demand.variety})</h3>
+                  <p className="text-xs text-[#065f46] font-semibold">
+                    Grade: {demand.requiredGrade} • Destination: {demand.deliveryLocation}
+                  </p>
+                  <p className="text-xs font-bold text-[#022c22] mt-1">
+                    Required: {demand.requiredQuantity.toLocaleString('en-IN')} {demand.unit} @ ₹{demand.targetMinPrice} - ₹{demand.targetMaxPrice}/unit
+                  </p>
+                </div>
+
+                <div className="bg-[#f6faf6] p-4 rounded-2xl border border-[#10b981]/30 text-center min-w-[140px]">
+                  <span className="text-[10px] font-black text-[#10b981] block">MATCHED PRODUCERS</span>
+                  <span className="text-2xl font-black text-[#022c22]">2 FPOs</span>
+                  <span className="text-[10px] text-[#065f46] block font-bold mt-1">Match Score: 94%</span>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* SECTION 3: LIVE TRACKING (REAL LEAFLET INTERACTIVE MAP) */}
-        {activeTab === 'live-tracking' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-[#022c22]">Live Transportation Map</h2>
-              <span className="text-xs font-bold text-[#065f46] bg-[#e1f2e6] px-3 py-1 rounded-full border border-[#10b981]/30">
-                Interactive OpenStreetMap GPS
-              </span>
-            </div>
-
-            {myOrders.length === 0 ? (
-              <div className="p-12 text-center rounded-3xl bg-white/80 border-1.5 border-[#10b981]/30 shadow-md">
-                <Navigation className="w-12 h-12 text-[#10b981]/50 mx-auto mb-3" />
-                <p className="text-sm font-extrabold text-[#065f46]">No active order to track.</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                
-                {/* Real Interactive Leaflet Map Component */}
-                <LiveTrackingMap 
-                  farmerLocationName={activeTracking?.farmerLocation || myOrders[0].farmerLocation}
-                  buyerLocationName={activeTracking?.buyerDestination || myOrders[0].buyerDestination}
-                  transporterName={activeTracking?.transporterName || myOrders[0].transporterName}
-                  status={activeTracking?.status || myOrders[0].status}
-                />
-
-                {/* Status Stepper */}
-                <div className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg">
-                  <h4 className="font-black text-sm text-[#022c22] mb-4">Delivery Status Progression</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-                    <div className="p-3 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30">
-                      <span className="text-[10px] font-black text-[#10b981] block">CONFIRMED</span>
-                      <span className="text-xs font-extrabold text-[#022c22]">Order Paid</span>
-                    </div>
-                    <div className="p-3 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30">
-                      <span className="text-[10px] font-black text-[#10b981] block">PICKED UP</span>
-                      <span className="text-xs font-extrabold text-[#022c22]">Loaded at Farm</span>
-                    </div>
-                    <div className="p-3 rounded-2xl bg-[#065f46] text-white shadow-md border border-[#10b981]/40">
-                      <span className="text-[10px] font-black text-[#a7f3d0] block">IN TRANSIT</span>
-                      <span className="text-xs font-black">On Highway</span>
-                    </div>
-                    <div className="p-3 rounded-2xl bg-gray-50 text-gray-400 border border-gray-200">
-                      <span className="text-[10px] font-extrabold block">NEAR DEST</span>
-                      <span className="text-xs font-bold">Approach Depot</span>
-                    </div>
-                    <div className="p-3 rounded-2xl bg-gray-50 text-gray-400 border border-gray-200">
-                      <span className="text-[10px] font-extrabold block">DELIVERED</span>
-                      <span className="text-xs font-bold font-mono">Final Handshake</span>
-                    </div>
-                  </div>
+        {/* TAB 4: ORDERS */}
+        {activeTab === 'my-orders' && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-black text-[#022c22]">Purchase Orders & Escrow Status</h2>
+            {myOrders.map((order) => (
+              <div key={order.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-base font-black text-[#022c22]">{order.cropName}</h4>
+                  <p className="text-xs text-[#065f46] font-semibold">Supplier: {order.farmerName} • Destination: {order.buyerDestination}</p>
                 </div>
-
+                <div className="text-right">
+                  <span className="text-xl font-black text-[#022c22] block">₹{order.totalPrice.toLocaleString('en-IN')}</span>
+                  <span className="text-xs font-extrabold text-[#10b981] bg-[#e1f2e6] px-2.5 py-1 rounded-lg border border-[#10b981]/30">
+                    Escrow Locked • {order.status}
+                  </span>
+                </div>
               </div>
-            )}
+            ))}
+          </div>
+        )}
+
+        {/* TAB 5: MAP */}
+        {activeTab === 'map' && (
+          <EcosystemMapView />
+        )}
+
+        {/* Payment Modal */}
+        {selectedCrop && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full border-2 border-[#10b981] shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="font-black text-base text-[#022c22]">Escrow Payment Authorization</h3>
+                <button onClick={() => setSelectedCrop(null)} className="text-gray-400 font-bold">✕</button>
+              </div>
+
+              {paymentStep === 'review' && (
+                <div className="space-y-3 text-xs font-semibold text-[#065f46]">
+                  <p>Crop: <span className="font-bold text-black">{selectedCrop.name}</span></p>
+                  <p>Quantity: <span className="font-bold text-black">{selectedCrop.quantity} {selectedCrop.unit}</span></p>
+                  <p>Total Escrow Lock: <span className="font-black text-[#065f46] text-base">₹{(selectedCrop.quantity * selectedCrop.pricePerUnit).toLocaleString('en-IN')}</span></p>
+
+                  <button
+                    onClick={() => {
+                      processAcceptFarmerOffer(selectedCrop);
+                      setPaymentStep('success');
+                      setTimeout(() => {
+                        setSelectedCrop(null);
+                        setActiveTab('my-orders');
+                      }, 1500);
+                    }}
+                    className="w-full py-3.5 rounded-2xl bg-[#065f46] text-white font-black text-xs hover:bg-[#10b981]"
+                  >
+                    Confirm Escrow Lock & Dispatch
+                  </button>
+                </div>
+              )}
+
+              {paymentStep === 'success' && (
+                <div className="py-6 text-center space-y-2">
+                  <CheckCircle2 className="w-12 h-12 text-[#10b981] mx-auto animate-bounce" />
+                  <h4 className="font-black text-base text-[#022c22]">Escrow Payment Locked!</h4>
+                  <p className="text-xs text-[#065f46]">Order created & driver dispatch notified.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

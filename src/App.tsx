@@ -5,7 +5,7 @@ import { LandingPage } from './pages/LandingPage.tsx';
 import { FarmerDashboard } from './pages/FarmerDashboard.tsx';
 import { BuyerDashboard } from './pages/BuyerDashboard.tsx';
 import { TransporterDashboard } from './pages/TransporterDashboard.tsx';
-import { AiAssistant } from './components/AiAssistant.tsx';
+import { MultilingualVoiceBar } from './components/MultilingualVoiceBar.tsx';
 
 export default function App() {
   return (
@@ -17,7 +17,7 @@ export default function App() {
           <Route path="/buyer" element={<BuyerDashboard />} />
           <Route path="/transporter" element={<TransporterDashboard />} />
         </Routes>
-        <AiAssistant />
+        <MultilingualVoiceBar />
       </BrowserRouter>
     </AuthProvider>
   );
