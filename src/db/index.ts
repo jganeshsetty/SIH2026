@@ -29,7 +29,7 @@ export const createPool = () => {
     } else {
       global._postgresPool = new Pool({
         host: process.env.SQL_HOST || 'localhost',
-        user: process.env.SQL_USER || 'farmora',
+        user: process.env.SQL_USER || 'postgres',
         password: process.env.SQL_PASSWORD || 'Ganesh@2008',
         database: process.env.SQL_DB_NAME || 'farmora',
         port: process.env.SQL_PORT ? parseInt(process.env.SQL_PORT) : 5432,

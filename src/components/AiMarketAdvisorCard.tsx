@@ -14,6 +14,7 @@ interface Props {
 export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, warehouses, demands, onExecuteAction }) => {
   const [recommendation, setRecommendation] = useState<AiRecommendation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timeElapsed, setTimeElapsed] = useState(0);
 
   const loadRecommendation = async () => {
     setLoading(true);
@@ -31,6 +32,54 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
   useEffect(() => {
     loadRecommendation();
   }, [crop]);
+
+  // Simulate market dynamics changing over time if the user takes no action
+  useEffect(() => {
+    if (loading || !recommendation) return;
+    
+    const interval = setInterval(() => {
+      setTimeElapsed(prev => prev + 1);
+    }, 5000); // Check every 5 seconds for demo purposes
+
+    return () => clearInterval(interval);
+  }, [loading, recommendation]);
+
+  useEffect(() => {
+    if (!recommendation) return;
+
+    if (timeElapsed === 2) { // After 10 seconds (2 * 5s)
+      setRecommendation(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          action: 'STORE',
+          headline: 'Market Shift Detected: Store crop due to sudden price drop',
+          reasoning: [
+            ...prev.reasoning,
+            'URGENT: Live market prices just dropped by 4% in your local Mandi.',
+            'Quality is holding up well; storing for 2 weeks will yield better returns.'
+          ],
+          financialProjection: {
+            ...prev.financialProjection,
+            immediateSaleRevenue: prev.financialProjection.immediateSaleRevenue * 0.96
+          }
+        };
+      });
+    } else if (timeElapsed === 4) { // After 20 seconds
+      setRecommendation(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          action: 'AGGREGATE',
+          headline: 'Quality Degrading: Aggregate with FPO to sell in bulk immediately',
+          reasoning: [
+            'URGENT: Freshness degrading. FPO bulk buyers are offering immediate pickup.',
+            'Avoid storage costs and further quality degradation.'
+          ]
+        };
+      });
+    }
+  }, [timeElapsed]);
 
   if (loading) {
     return (
@@ -71,7 +120,7 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
         </div>
 
         <button 
-          onClick={loadRecommendation}
+          onClick={() => { setTimeElapsed(0); loadRecommendation(); }}
           className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-white border border-[#10b981]/30 text-xs font-extrabold text-[#065f46] hover:bg-[#e1f2e6] transition-colors flex items-center gap-1.5 shadow-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />

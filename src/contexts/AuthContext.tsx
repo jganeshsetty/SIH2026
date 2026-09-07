@@ -3,14 +3,18 @@ import { User as FirebaseUser, signInWithPopup, signOut, onAuthStateChanged } fr
 import { auth, googleAuthProvider } from '../lib/firebase.ts';
 import { User as AppUser } from '../types.ts';
 
+export type UserRole = 'farmer' | 'buyer' | 'transporter' | 'FARMER' | 'BUYER' | 'TRANSPORT_DRIVER';
+
 interface AuthContextType {
   user: FirebaseUser | null;
   appUser: AppUser | null;
   loading: boolean;
-  signInWithGoogle: (role: 'farmer' | 'buyer' | 'transporter') => Promise<AppUser | null>;
-  setRole: (role: 'farmer' | 'buyer' | 'transporter') => void;
-  logout: () => Promise<void>;
   token: string | null;
+  registerWithEmail: (data: { email: string; password: string; name: string; role: UserRole; phone?: string; address?: string }) => Promise<AppUser>;
+  loginWithEmail: (data: { email: string; password: string }) => Promise<AppUser>;
+  signInWithGoogle: (role: UserRole) => Promise<AppUser | null>;
+  setRole: (role: UserRole) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -19,9 +23,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('farmora_token'));
 
-  const syncUserWithBackend = async (idToken: string, role?: 'farmer' | 'buyer' | 'transporter', name?: string) => {
+  // Fetch user profile from PostgreSQL using token
+  const fetchUserProfile = async (authToken: string) => {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        const profile: AppUser = await res.json();
+        setAppUser(profile);
+        return profile;
+      } else {
+        // Token expired or invalid
+        localStorage.removeItem('farmora_token');
+        setToken(null);
+        setAppUser(null);
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
+    return null;
+  };
+
+  const syncUserWithBackend = async (idToken: string, role?: UserRole, name?: string) => {
     try {
       const res = await fetch('/api/auth/sync', {
         method: 'POST',
@@ -43,39 +69,96 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        try {
-          const idToken = await firebaseUser.getIdToken();
-          setToken(idToken);
-          const storedRole = (localStorage.getItem('farmora_pending_role') || 'buyer') as 'farmer' | 'buyer' | 'transporter';
-          await syncUserWithBackend(idToken, storedRole, firebaseUser.displayName || 'Farmora User');
-        } catch (e) {
-          console.error('Error fetching ID token:', e);
-        }
-      } else {
-        setToken(null);
-        setAppUser(null);
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('farmora_token');
+      if (storedToken) {
+        setToken(storedToken);
+        await fetchUserProfile(storedToken);
       }
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
+      if (auth) {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+          setUser(firebaseUser);
+          if (firebaseUser && !localStorage.getItem('farmora_token')) {
+            try {
+              const idToken = await firebaseUser.getIdToken();
+              setToken(idToken);
+              localStorage.setItem('farmora_token', idToken);
+              const storedRole = (localStorage.getItem('farmora_pending_role') || 'buyer') as UserRole;
+              await syncUserWithBackend(idToken, storedRole, firebaseUser.displayName || 'Farmora User');
+            } catch (e) {
+              console.error('Error fetching Firebase ID token:', e);
+            }
+          }
+          setLoading(false);
+        });
+        return () => unsubscribe();
+      } else {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
-  const signInWithGoogle = async (role: 'farmer' | 'buyer' | 'transporter') => {
+  const registerWithEmail = async (data: { email: string; password: string; name: string; role: UserRole; phone?: string; address?: string }): Promise<AppUser> => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'Failed to register');
+      }
+
+      localStorage.setItem('farmora_token', resData.token);
+      setToken(resData.token);
+      setAppUser(resData.user);
+      setLoading(false);
+      return resData.user;
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
+  };
+
+  const loginWithEmail = async (data: { email: string; password: string }): Promise<AppUser> => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'Failed to log in');
+      }
+
+      localStorage.setItem('farmora_token', resData.token);
+      setToken(resData.token);
+      setAppUser(resData.user);
+      setLoading(false);
+      return resData.user;
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
+  };
+
+  const signInWithGoogle = async (role: UserRole) => {
     setLoading(true);
     try {
       localStorage.setItem('farmora_pending_role', role);
       const result = await signInWithPopup(auth, googleAuthProvider);
       const idToken = await result.user.getIdToken();
       setToken(idToken);
+      localStorage.setItem('farmora_token', idToken);
       const syncedUser = await syncUserWithBackend(idToken, role, result.user.displayName || 'Farmora User');
       setLoading(false);
       return syncedUser;
@@ -86,21 +169,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const setRole = (role: 'farmer' | 'buyer' | 'transporter') => {
+  const setRole = (role: UserRole) => {
     if (appUser && token) {
       syncUserWithBackend(token, role, appUser.name);
     } else {
-      setAppUser(prev => prev ? { ...prev, role } : {
+      setAppUser(prev => prev ? { ...prev, role: role as any } : {
         id: 1,
-        uid: 'demo-user-123',
+        uid: 'user-123',
         email: 'user@farmora.io',
-        name: `Farmora ${role.toUpperCase()}`,
-        role
+        name: `Farmora User`,
+        role: role as any
       });
     }
   };
 
   const logout = async () => {
+    setLoading(true);
     try {
       if (auth) await signOut(auth);
     } catch (e) {
@@ -109,15 +193,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setAppUser(null);
     setToken(null);
+    localStorage.removeItem('farmora_token');
     localStorage.removeItem('farmora_pending_role');
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, appUser, loading, signInWithGoogle, setRole, logout, token }}>
+    <AuthContext.Provider value={{
+      user,
+      appUser,
+      loading,
+      token,
+      registerWithEmail,
+      loginWithEmail,
+      signInWithGoogle,
+      setRole,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => useContext(AuthContext);
-

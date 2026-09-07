@@ -1,7 +1,7 @@
 import { MandiPrice, Warehouse, FPO, BuyerDemand, BuyerTrustProfile } from '../types.ts';
 
 // Verified Benchmark Dataset for Authentic Indian Mandis, Warehouses, and FPOs
-// Configured with ONE realistic demo sample: Tomato | Grade A | 5000 kg | ₹32/kg | Nashik, Maharashtra
+// Configured with realistic sample data: Tomato | Grade A | 5000 kg | ₹32/kg | Nashik, Maharashtra
 export const BENCHMARK_MANDI_PRICES: MandiPrice[] = [
   {
     id: 1,

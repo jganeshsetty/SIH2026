@@ -135,7 +135,7 @@ export const MultilingualVoiceBar: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-bold text-sm text-white">Farmora AI Assistant</h3>
-                <span className="text-xs text-emerald-200 font-medium block">SIH 2026 Market Intelligence</span>
+                <span className="text-xs text-emerald-200 font-medium block">Market Intelligence & Guidance</span>
               </div>
             </div>
 

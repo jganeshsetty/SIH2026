@@ -19,15 +19,18 @@ import {
   Target,
   BarChart3,
   Layers,
-  Award
+  MessageCircle,
+  Eye,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { LiveTrackingMap } from '../components/LiveTrackingMap.tsx';
 import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
 import { BuyerTrustBadge } from '../components/BuyerTrustBadge.tsx';
-import { SmartMatchingWidget } from '../components/SmartMatchingWidget.tsx';
 import { EcosystemMapView } from '../components/EcosystemMapView.tsx';
+import { ChatWidget } from '../components/ChatWidget.tsx';
 import { BENCHMARK_BUYER_DEMANDS } from '../services/marketData.ts';
-import { BuyerDemand, Crop as AppCrop } from '../types.ts';
+import { BuyerDemand } from '../types.ts';
 
 interface AvailableCrop {
   id: number;
@@ -41,6 +44,7 @@ interface AvailableCrop {
   imageUrl: string;
   status?: 'AVAILABLE' | 'ACCEPTED' | 'ORDER_CONFIRMED';
   quality?: string;
+  harvestDate?: string;
 }
 
 interface BuyerOrder {
@@ -68,7 +72,8 @@ const INITIAL_CROPS: AvailableCrop[] = [
     pricePerUnit: 32,
     description: 'Fresh field-picked hybrid tomatoes, Grade A sorted for wholesale procurement.',
     imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80',
-    quality: 'Grade A Fresh'
+    quality: 'Grade A Fresh',
+    harvestDate: '2026-09-10'
   }
 ];
 
@@ -91,7 +96,7 @@ const INITIAL_ORDERS: BuyerOrder[] = [
 export const BuyerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, appUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'available-crops' | 'post-demand' | 'my-demands' | 'my-orders' | 'live-tracking' | 'map'>('available-crops');
+  const [activeTab, setActiveTab] = useState<'available-crops' | 'my-orders' | 'post-demand' | 'map' | 'delivery'>('available-crops');
 
   // Demands state
   const [demands, setDemands] = useState<BuyerDemand[]>(BENCHMARK_BUYER_DEMANDS);
@@ -107,6 +112,22 @@ export const BuyerDashboard: React.FC = () => {
   const [deliveryLocation, setDeliveryLocation] = useState('Mumbai Central Agro Depot, Maharashtra');
   const [requiredByDate, setRequiredByDate] = useState('2026-09-15');
   const [toastMsg, setToastMsg] = useState('');
+
+  // Chat State
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatPartner, setChatPartner] = useState({ id: 1, name: 'Ganesh (Farmer)' });
+
+  // Detail Modal State
+  const [detailModalCrop, setDetailModalCrop] = useState<AvailableCrop | null>(null);
+
+  // Active delivery dynamic state
+  const [activeDelivery, setActiveDelivery] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('farmora_active_delivery');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
 
   // Persistent crops list
   const [crops, setCrops] = useState<AvailableCrop[]>(() => {
@@ -124,6 +145,42 @@ export const BuyerDashboard: React.FC = () => {
     } catch (e) {}
     return INITIAL_ORDERS;
   });
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'farmora_crops') {
+        try {
+          if (e.newValue) {
+            setCrops(JSON.parse(e.newValue));
+          }
+        } catch (err) {}
+      }
+      if (e.key === 'farmora_buyer_orders') {
+        try {
+          if (e.newValue) {
+            setMyOrders(JSON.parse(e.newValue));
+            if (e.oldValue !== e.newValue && e.newValue.includes('IN_TRANSIT')) {
+              setToastMsg('Farmer Accepted Your Order! Escrow processed.');
+              setTimeout(() => setToastMsg(''), 3500);
+            }
+          }
+        } catch (err) {}
+      }
+      if (e.key === 'farmora_active_delivery') {
+        try {
+          if (e.newValue) {
+            setActiveDelivery(JSON.parse(e.newValue));
+          }
+        } catch (err) {}
+      }
+      if (e.key === 'farmora_chats') {
+        setToastMsg('New Message Received from Farmer!');
+        setTimeout(() => setToastMsg(''), 3500);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const [selectedCrop, setSelectedCrop] = useState<AvailableCrop | null>(null);
   const [paymentStep, setPaymentStep] = useState<'review' | 'escrow' | 'success'>('review');
@@ -150,11 +207,10 @@ export const BuyerDashboard: React.FC = () => {
     };
 
     setDemands([newDemand, ...demands]);
-    setToastMsg('Buyer Demand Posted! Smart Matching enabled for Farmers & FPOs.');
+    setToastMsg('Buyer Demand Posted! Smart Matching broadcasted to Farmers.');
     setTimeout(() => {
       setToastMsg('');
-      setActiveTab('my-demands');
-    }, 1500);
+    }, 3000);
   };
 
   const processAcceptFarmerOffer = (crop: AvailableCrop) => {
@@ -167,7 +223,7 @@ export const BuyerDashboard: React.FC = () => {
       quantity: crop.quantity,
       totalPrice,
       status: 'ORDER_CONFIRMED',
-      transporterName: 'Express Freight Driver Mark',
+      transporterName: 'Kisan Express Logistics (Driver: Ramesh Shinde)',
       currentLocation: 'Farmer Hub Dispatch Point',
       estimatedArrival: 'Tomorrow, 2:00 PM',
       buyerDestination: 'Wholesale Depot Hub, Mumbai'
@@ -177,6 +233,21 @@ export const BuyerDashboard: React.FC = () => {
     setMyOrders(updatedOrders);
     try {
       localStorage.setItem('farmora_buyer_orders', JSON.stringify(updatedOrders));
+      
+      // Write Offer to 'farmora_offers' so the Farmer receives notification instantly
+      const existingOffers = JSON.parse(localStorage.getItem('farmora_offers') || '[]');
+      const newOffer = {
+        id: newOrder.id,
+        cropId: crop.id,
+        buyerName: appUser?.name || 'Reliance Fresh Agro Procurement',
+        cropName: crop.name,
+        offeredQuantity: crop.quantity,
+        offeredPrice: totalPrice,
+        date: new Date().toISOString().split('T')[0],
+        status: 'PENDING'
+      };
+      localStorage.setItem('farmora_offers', JSON.stringify([newOffer, ...existingOffers]));
+      window.dispatchEvent(new Event('storage'));
     } catch (e) {}
 
     return newOrder;
@@ -196,290 +267,469 @@ export const BuyerDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="relative z-20 max-w-7xl mx-auto">
+      <div className="relative z-20 max-w-7xl mx-auto space-y-6">
 
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#10b981]/30">
+        {/* Top Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-3xl bg-white/90 backdrop-blur-xl border-1.5 border-[#10b981]/30 shadow-md">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/')} 
-              className="p-2.5 rounded-2xl bg-white/80 border-1.5 border-[#10b981]/40 text-[#065f46] hover:bg-[#e1f2e6] transition-colors shadow-sm"
+              className="p-2.5 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/40 text-[#065f46] hover:bg-[#10b981] hover:text-white transition-all shadow-xs"
+              title="Return to Home"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <span className="text-xs font-black text-[#10b981] uppercase tracking-widest block">WHOLESALE PROCUREMENT</span>
-              <h1 className="text-3xl font-black text-[#022c22]">Buyer Procurement Hub</h1>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-white bg-[#065f46] px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                  FARMORA BUYER PORTAL
+                </span>
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
+                  Wholesale Procurement
+                </span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">Wholesale Procurement Hub</h1>
             </div>
+          </div>
 
-            {user ? (
-              <div className="flex items-center gap-2 bg-white/90 px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-sm ml-2">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt={user.displayName || 'User'} className="w-7 h-7 rounded-full border border-[#10b981]" />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold">
-                    {(user.displayName || user.email || 'B')[0].toUpperCase()}
-                  </div>
-                )}
-                <span className="text-xs font-bold text-[#022c22] max-w-[100px] truncate">{user.displayName || user.email}</span>
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            {appUser || user ? (
+              <div className="flex items-center gap-2 bg-[#e1f2e6] px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs">
+                  {(appUser?.name || user?.displayName || user?.email || 'B')[0].toUpperCase()}
+                </div>
+                <div className="text-left leading-tight hidden sm:block">
+                  <span className="text-xs font-bold text-[#022c22] block max-w-[140px] truncate">
+                    {appUser?.name || user?.displayName || user?.email}
+                  </span>
+                  <span className="text-[10px] font-bold text-[#065f46] uppercase tracking-wider">Buyer Account</span>
+                </div>
                 <button
-                  onClick={() => { logout(); navigate('/'); }}
+                  onClick={async () => { await logout(); navigate('/auth'); }}
                   title="Sign Out"
-                  className="p-1 rounded-lg text-[#065f46] hover:bg-red-50 hover:text-red-600 transition-colors"
+                  className="p-1.5 rounded-xl text-[#065f46] hover:bg-rose-100 hover:text-rose-600 transition-colors ml-1 flex items-center gap-1 font-bold text-xs"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden md:inline">Logout</span>
                 </button>
               </div>
             ) : null}
           </div>
+        </div>
 
-          {/* Tab Switcher */}
-          <div className="flex flex-wrap items-center gap-2 bg-white/85 backdrop-blur-xl p-1.5 rounded-2xl border-1.5 border-[#10b981]/35 shadow-md text-xs font-extrabold">
+        {/* Strict 5-Page Tab Navigation Bar */}
+        <div className="bg-white/95 backdrop-blur-xl p-2 rounded-3xl border-1.5 border-[#10b981]/35 shadow-md">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            
             <button
               onClick={() => setActiveTab('available-crops')}
-              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
-                activeTab === 'available-crops' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'available-crops'
+                  ? 'bg-[#065f46] text-white shadow-md shadow-[#065f46]/20'
+                  : 'text-[#065f46] hover:bg-[#e1f2e6] hover:text-[#022c22]'
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>Available Produce</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('post-demand')}
-              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
-                activeTab === 'post-demand' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
-              }`}
-            >
-              <PlusCircle className="w-4 h-4 text-[#10b981]" />
-              <span>Post Crop Demand</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('my-demands')}
-              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
-                activeTab === 'my-demands' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
-              }`}
-            >
-              <Target className="w-4 h-4" />
-              <span>Active Demands ({demands.length})</span>
+              <span>1. Available Produce</span>
             </button>
 
             <button
               onClick={() => setActiveTab('my-orders')}
-              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
-                activeTab === 'my-orders' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'my-orders'
+                  ? 'bg-[#065f46] text-white shadow-md shadow-[#065f46]/20'
+                  : 'text-[#065f46] hover:bg-[#e1f2e6] hover:text-[#022c22]'
               }`}
             >
               <Package className="w-4 h-4" />
-              <span>Orders ({myOrders.length})</span>
+              <span>2. My Orders ({myOrders.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('post-demand')}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'post-demand'
+                  ? 'bg-[#065f46] text-white shadow-md shadow-[#065f46]/20'
+                  : 'text-[#065f46] hover:bg-[#e1f2e6] hover:text-[#022c22]'
+              }`}
+            >
+              <Target className="w-4 h-4 text-[#10b981]" />
+              <span>3. Buyer Demands</span>
             </button>
 
             <button
               onClick={() => setActiveTab('map')}
-              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
-                activeTab === 'map' ? 'bg-[#065f46] text-white shadow-sm' : 'text-[#065f46] hover:bg-[#e1f2e6]'
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'map'
+                  ? 'bg-[#065f46] text-white shadow-md shadow-[#065f46]/20'
+                  : 'text-[#065f46] hover:bg-[#e1f2e6] hover:text-[#022c22]'
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>Map View</span>
+              <span>4. Ecosystem Map</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('delivery')}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'delivery'
+                  ? 'bg-[#065f46] text-white shadow-md shadow-[#065f46]/20'
+                  : 'text-[#065f46] hover:bg-[#e1f2e6] hover:text-[#022c22]'
+              }`}
+            >
+              <Truck className="w-4 h-4" />
+              <span>5. Transportation</span>
+            </button>
+
           </div>
         </div>
 
-        {/* Buyer Trust Profile Banner */}
-        <div className="mb-6">
-          <BuyerTrustBadge buyerId={appUser?.id || 2} buyerName={appUser?.name} />
-        </div>
+        {/* Buyer Trust Badge Banner */}
+        <BuyerTrustBadge buyerId={appUser?.id || 2} buyerName={appUser?.name} />
 
-        {/* TAB 1: AVAILABLE CROPS */}
+        {/* PAGE 1: AVAILABLE CROPS WITH DETAILS & CHAT */}
         {activeTab === 'available-crops' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {crops.map((crop) => (
-              <div key={crop.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col justify-between space-y-4">
-                <div className="flex gap-4">
-                  <img src={crop.imageUrl} alt={crop.name} className="w-24 h-24 rounded-2xl object-cover border border-[#10b981]/30" />
-                  <div>
-                    <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
-                      {crop.quality || 'Grade A'}
-                    </span>
-                    <h3 className="text-lg font-black text-[#022c22] mt-1">{crop.name}</h3>
-                    <p className="text-xs text-[#065f46] font-semibold">{crop.farmerName} • {crop.farmerLocation}</p>
-                    <div className="mt-2 text-xs font-black text-[#022c22]">
-                      {crop.quantity.toLocaleString('en-IN')} {crop.unit} @ ₹{crop.pricePerUnit}/unit
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-[#022c22]">Available Farmer Produce</h2>
+                <p className="text-xs text-[#065f46] font-semibold">Direct listings from verified regional producers ready for procurement.</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
+                {crops.length} Listed Harvest(s)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {crops.map((crop) => (
+                <div key={crop.id} className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col justify-between space-y-4">
+                  <div className="flex gap-4">
+                    <img src={crop.imageUrl} alt={crop.name} className="w-24 h-24 rounded-2xl object-cover border border-[#10b981]/30 shadow-sm" />
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                        {crop.quality || 'Grade A Fresh'}
+                      </span>
+                      <h3 className="text-lg font-black text-[#022c22]">{crop.name}</h3>
+                      <p className="text-xs text-[#065f46] font-semibold">{crop.farmerName} • {crop.farmerLocation}</p>
+                      <div className="mt-2 text-xs font-black text-[#022c22]">
+                        {crop.quantity.toLocaleString('en-IN')} {crop.unit} @ ₹{crop.pricePerUnit}/unit
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  onClick={() => { setSelectedCrop(crop); setPaymentStep('review'); }}
-                  className="w-full py-3 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-colors flex items-center justify-center gap-2 shadow-md"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>Buy Direct & Lock Escrow (₹{(crop.quantity * crop.pricePerUnit).toLocaleString('en-IN')})</span>
-                </button>
-              </div>
-            ))}
+                  <p className="text-xs text-gray-600 line-clamp-2 italic bg-[#f6faf6] p-2.5 rounded-xl border border-gray-100">
+                    "{crop.description}"
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => setDetailModalCrop(crop)}
+                      className="py-3 rounded-2xl bg-[#e1f2e6] hover:bg-[#10b981] hover:text-white text-[#065f46] text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>View Details & Chat</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setSelectedCrop(crop); setPaymentStep('review'); }}
+                      className="py-3 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-colors flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>Buy Direct (₹{(crop.quantity * crop.pricePerUnit).toLocaleString('en-IN')})</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* TAB 2: POST CROP DEMAND */}
-        {activeTab === 'post-demand' && (
-          <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border-1.5 border-[#10b981]/35 shadow-2xl space-y-6">
-            <div className="flex items-center gap-3 pb-4 border-b border-[#10b981]/20">
-              <div className="w-11 h-11 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30 flex items-center justify-center text-[#065f46]">
-                <Target className="w-6 h-6" />
-              </div>
+        {/* PAGE 2: MY ORDERS / TRANSACTIONS */}
+        {activeTab === 'my-orders' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-[#022c22]">Post Bulk Crop Requirement</h2>
-                <p className="text-xs text-[#065f46] font-semibold">Broadcast grade specs to regional Farmers & FPOs with smart matching.</p>
+                <h2 className="text-xl font-black text-[#022c22]">Purchase Orders & Escrow Status</h2>
+                <p className="text-xs text-[#065f46] font-semibold">Track order confirmations, escrow payments, and supplier notifications.</p>
               </div>
             </div>
 
-            <form onSubmit={handlePostDemand} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {myOrders.map((order) => (
+              <div key={order.id} className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                      ORDER #{order.id}
+                    </span>
+                    <span className="text-[10px] font-bold text-[#065f46]">Supplier: {order.farmerName}</span>
+                  </div>
+                  <h4 className="text-lg font-black text-[#022c22]">{order.cropName} ({order.quantity.toLocaleString('en-IN')} kg)</h4>
+                  <p className="text-xs text-[#065f46] font-semibold">Destination: {order.buyerDestination}</p>
+                  <p className="text-xs text-gray-500 font-bold">Transporter: {order.transporterName}</p>
+                </div>
+
+                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100">
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-[#065f46] block">₹{order.totalPrice.toLocaleString('en-IN')}</span>
+                    <span className="text-xs font-extrabold text-[#10b981] bg-[#e1f2e6] px-2.5 py-1 rounded-lg border border-[#10b981]/30 inline-block mt-1">
+                      Escrow Locked • {order.status}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('delivery')}
+                    className="mt-2 px-4 py-2 rounded-xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Track Live GPS</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* PAGE 3: POST CROP DEMAND & ACTIVE DEMANDS LIST (MERGED) */}
+        {activeTab === 'post-demand' && (
+          <div className="space-y-8">
+            
+            {/* Top Section: Form */}
+            <div className="max-w-3xl mx-auto bg-white/95 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border-1.5 border-[#10b981]/35 shadow-2xl space-y-6">
+              <div className="flex items-center gap-3 pb-4 border-b border-[#10b981]/20">
+                <div className="w-12 h-12 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/30 flex items-center justify-center text-[#065f46]">
+                  <Target className="w-6 h-6 text-[#10b981]" />
+                </div>
                 <div>
-                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Crop Name *</label>
+                  <h2 className="text-xl font-black text-[#022c22]">Post Bulk Crop Requirement</h2>
+                  <p className="text-xs text-[#065f46] font-semibold">Broadcast specs to regional Farmers & FPOs with automated matching.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handlePostDemand} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Crop Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={cropName}
+                      onChange={(e) => setCropName(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22] bg-[#f6faf6]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Required Grade / Quality *</label>
+                    <select
+                      value={requiredGrade}
+                      onChange={(e) => setRequiredGrade(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22] bg-[#f6faf6]"
+                    >
+                      <option value="Grade A Fresh">Grade A Fresh</option>
+                      <option value="Grade A Organic">Grade A Organic</option>
+                      <option value="Export Grade (55mm+)">Export Grade (55mm+)</option>
+                      <option value="Standard Grade B">Standard Grade B</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Quantity (kg) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22] bg-[#f6faf6]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Target Min Price (₹/kg)</label>
+                    <input
+                      type="number"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22] bg-[#f6faf6]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Target Max Price (₹/kg)</label>
+                    <input
+                      type="number"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22] bg-[#f6faf6]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#022c22] mb-1">Delivery Destination Hub</label>
                   <input
                     type="text"
-                    required
-                    value={cropName}
-                    onChange={(e) => setCropName(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
+                    value={deliveryLocation}
+                    onChange={(e) => setDeliveryLocation(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22] bg-[#f6faf6]"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Required Grade / Quality *</label>
-                  <select
-                    value={requiredGrade}
-                    onChange={(e) => setRequiredGrade(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
-                  >
-                    <option value="Grade A Premium">Grade A Premium</option>
-                    <option value="Grade A Organic">Grade A Organic</option>
-                    <option value="Export Grade (55mm+)">Export Grade (55mm+)</option>
-                    <option value="Standard Grade B">Standard Grade B</option>
-                  </select>
-                </div>
+                <button
+                  type="submit"
+                  className="w-full py-4 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Target className="w-5 h-5 text-[#a7f3d0]" />
+                  <span>Post Demand & Enable Smart Farmer Matching</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Bottom Section: Active Posted Demands List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-[#10b981]/20 pb-3">
+                <h3 className="text-xl font-black text-[#022c22]">Your Active Posted Demands</h3>
+                <span className="text-xs font-black bg-[#e1f2e6] text-[#065f46] px-3 py-1 rounded-full border border-[#10b981]/30">
+                  {demands.length} Demands Live
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Quantity (kg) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
-                  />
+              {demands.map((demand) => (
+                <div key={demand.id} className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div>
+                    <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                      DEMAND #{demand.id} • {demand.status}
+                    </span>
+                    <h4 className="text-lg font-black text-[#022c22] mt-1">{demand.cropName} ({demand.variety})</h4>
+                    <p className="text-xs text-[#065f46] font-semibold">
+                      Grade: {demand.requiredGrade} • Destination: {demand.deliveryLocation}
+                    </p>
+                    <p className="text-xs font-bold text-[#022c22] mt-1">
+                      Required: {demand.requiredQuantity.toLocaleString('en-IN')} {demand.unit} @ ₹{demand.targetMinPrice} - ₹{demand.targetMaxPrice}/unit
+                    </p>
+                  </div>
+
+                  <div className="bg-[#f6faf6] p-4 rounded-2xl border border-[#10b981]/30 text-center min-w-[150px]">
+                    <span className="text-[10px] font-black text-[#10b981] block">MATCHED PRODUCERS</span>
+                    <span className="text-2xl font-black text-[#022c22]">2 FPOs</span>
+                    <span className="text-[10px] text-[#065f46] block font-bold mt-1">Match Score: 94%</span>
+                  </div>
                 </div>
+              ))}
+            </div>
 
-                <div>
-                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Target Min Price (₹/kg)</label>
-                  <input
-                    type="number"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-[#022c22] mb-1">Target Max Price (₹/kg)</label>
-                  <input
-                    type="number"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-extrabold text-[#022c22] mb-1">Delivery Destination Hub</label>
-                <input
-                  type="text"
-                  value={deliveryLocation}
-                  onChange={(e) => setDeliveryLocation(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-[#10b981]/30 text-xs font-bold text-[#022c22]"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-4 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                <Target className="w-5 h-5" />
-                <span>Post Demand & Enable Smart Farmer Matching</span>
-              </button>
-            </form>
           </div>
         )}
 
-        {/* TAB 3: ACTIVE DEMANDS */}
-        {activeTab === 'my-demands' && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-black text-[#022c22]">Active Buyer Demands & Matches</h2>
-            {demands.map((demand) => (
-              <div key={demand.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div>
-                  <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
-                    DEMAND #{demand.id} • {demand.status}
-                  </span>
-                  <h3 className="text-lg font-black text-[#022c22] mt-1">{demand.cropName} ({demand.variety})</h3>
-                  <p className="text-xs text-[#065f46] font-semibold">
-                    Grade: {demand.requiredGrade} • Destination: {demand.deliveryLocation}
-                  </p>
-                  <p className="text-xs font-bold text-[#022c22] mt-1">
-                    Required: {demand.requiredQuantity.toLocaleString('en-IN')} {demand.unit} @ ₹{demand.targetMinPrice} - ₹{demand.targetMaxPrice}/unit
-                  </p>
-                </div>
-
-                <div className="bg-[#f6faf6] p-4 rounded-2xl border border-[#10b981]/30 text-center min-w-[140px]">
-                  <span className="text-[10px] font-black text-[#10b981] block">MATCHED PRODUCERS</span>
-                  <span className="text-2xl font-black text-[#022c22]">2 FPOs</span>
-                  <span className="text-[10px] text-[#065f46] block font-bold mt-1">Match Score: 94%</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* TAB 4: ORDERS */}
-        {activeTab === 'my-orders' && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-black text-[#022c22]">Purchase Orders & Escrow Status</h2>
-            {myOrders.map((order) => (
-              <div key={order.id} className="p-6 rounded-3xl bg-white/85 backdrop-blur-xl border-1.5 border-[#10b981]/35 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-base font-black text-[#022c22]">{order.cropName}</h4>
-                  <p className="text-xs text-[#065f46] font-semibold">Supplier: {order.farmerName} • Destination: {order.buyerDestination}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xl font-black text-[#022c22] block">₹{order.totalPrice.toLocaleString('en-IN')}</span>
-                  <span className="text-xs font-extrabold text-[#10b981] bg-[#e1f2e6] px-2.5 py-1 rounded-lg border border-[#10b981]/30">
-                    Escrow Locked • {order.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* TAB 5: MAP */}
+        {/* PAGE 4: MAP VIEW */}
         {activeTab === 'map' && (
           <EcosystemMapView />
         )}
 
-        {/* Payment Modal */}
+        {/* PAGE 5: TRANSPORTATION / LIVE TRACKING */}
+        {activeTab === 'delivery' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-[#022c22]">Live Transportation & Delivery GPS</h2>
+                <p className="text-xs text-[#065f46] font-semibold">Real-time driver location and temperature-monitored transit tracking.</p>
+              </div>
+            </div>
+
+            {/* Quality Verification Audit Badge if verified */}
+            {activeDelivery?.qualityVerification && (
+              <div className="p-4 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/40 text-xs font-semibold text-[#065f46] flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <img src={activeDelivery.qualityVerification.photoUrl} alt="Verified Crop" className="w-14 h-14 rounded-xl object-cover border border-[#10b981]/30 shadow-xs" />
+                  <div>
+                    <span className="font-black text-[#022c22] text-sm block flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#10b981]" />
+                      Driver Quality Inspection Report Verified ({activeDelivery.qualityVerification.inspectedAt})
+                    </span>
+                    <span className="text-[11px] text-[#065f46] block mt-0.5">
+                      Grade A Freshness: Approved • Temperature & Moisture: Compliant • Photo Audit Verified.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Live GPS Map */}
+            <LiveTrackingMap 
+              farmerLocationName={activeDelivery?.farmerLocation || 'Nashik Farmer Hub, Maharashtra'}
+              buyerLocationName={activeDelivery?.buyerLocation || 'Mumbai Central Agro Depot, Maharashtra'}
+              transporterName="Kisan Express Logistics (Driver: Ramesh Shinde)"
+              status={activeDelivery?.status || 'IN_TRANSIT'}
+              pathType={activeDelivery?.pathType || 'Farmer → Buyer'}
+              qualityVerified={!!activeDelivery?.qualityVerification}
+            />
+          </div>
+        )}
+
+        {/* CROP DETAIL MODAL & CHAT TRIGGER */}
+        {detailModalCrop && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-lg w-full border-2 border-[#10b981] shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <div>
+                  <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                    {detailModalCrop.quality || 'Grade A Fresh'}
+                  </span>
+                  <h3 className="font-black text-xl text-[#022c22] mt-1">{detailModalCrop.name} Details</h3>
+                </div>
+                <button onClick={() => setDetailModalCrop(null)} className="text-gray-400 hover:text-black font-bold p-1">✕</button>
+              </div>
+
+              <img src={detailModalCrop.imageUrl} alt={detailModalCrop.name} className="w-full h-48 rounded-2xl object-cover border border-[#10b981]/30 shadow-sm" />
+
+              <div className="space-y-2 text-xs font-semibold text-[#065f46]">
+                <p>Producer / Farmer: <span className="font-bold text-black">{detailModalCrop.farmerName}</span></p>
+                <p>Location: <span className="font-bold text-black">{detailModalCrop.farmerLocation}</span></p>
+                <p>Available Quantity: <span className="font-bold text-black">{detailModalCrop.quantity.toLocaleString('en-IN')} {detailModalCrop.unit}</span></p>
+                <p>Price: <span className="font-bold text-[#065f46] text-base">₹{detailModalCrop.pricePerUnit} / {detailModalCrop.unit}</span></p>
+                <p>Harvest Date: <span className="font-bold text-black">{detailModalCrop.harvestDate || '2026-09-10'}</span></p>
+                <div className="p-3 bg-[#f6faf6] rounded-xl border border-gray-200 mt-2">
+                  <span className="font-bold text-black block mb-1">Description & Quality Notes:</span>
+                  <p className="text-gray-700 italic">{detailModalCrop.description}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                <button
+                  onClick={() => {
+                    setChatPartner({ id: 1, name: detailModalCrop.farmerName });
+                    setChatOpen(true);
+                    setDetailModalCrop(null);
+                  }}
+                  className="py-3.5 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-black text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-700" />
+                  <span>💬 Chat with Farmer</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSelectedCrop(detailModalCrop);
+                    setPaymentStep('review');
+                    setDetailModalCrop(null);
+                  }}
+                  className="py-3.5 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white font-black text-xs transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Buy & Lock Escrow</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PAYMENT / ESCROW MODAL */}
         {selectedCrop && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-6 max-w-md w-full border-2 border-[#10b981] shadow-2xl space-y-4">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-black text-base text-[#022c22]">Escrow Payment Authorization</h3>
-                <button onClick={() => setSelectedCrop(null)} className="text-gray-400 font-bold">✕</button>
+                <button onClick={() => setSelectedCrop(null)} className="text-gray-400 font-bold p-1">✕</button>
               </div>
 
               {paymentStep === 'review' && (
@@ -497,9 +747,10 @@ export const BuyerDashboard: React.FC = () => {
                         setActiveTab('my-orders');
                       }, 1500);
                     }}
-                    className="w-full py-3.5 rounded-2xl bg-[#065f46] text-white font-black text-xs hover:bg-[#10b981]"
+                    className="w-full py-3.5 rounded-2xl bg-[#065f46] text-white font-black text-xs hover:bg-[#10b981] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Confirm Escrow Lock & Dispatch
+                    <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
+                    <span>Confirm Escrow Lock & Dispatch</span>
                   </button>
                 </div>
               )}
@@ -516,6 +767,16 @@ export const BuyerDashboard: React.FC = () => {
         )}
 
       </div>
+
+      {/* CHAT WIDGET */}
+      <ChatWidget
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        buyerName={chatPartner.name}
+        currentUserId={appUser?.id || 2}
+        recipientId={chatPartner.id}
+      />
+
     </div>
   );
 };

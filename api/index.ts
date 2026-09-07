@@ -4,6 +4,7 @@ import { db } from "../src/db/index.ts";
 import { users, crops, buyerRequests, transactions, transportRequests, trackingUpdates } from "../src/db/schema.ts";
 import { eq, desc } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
+import { hashPassword, verifyPassword, generateToken } from "../src/lib/auth-utils.ts";
 
 const app = express();
 
@@ -11,25 +12,146 @@ app.use(express.json());
 
 // API Routes
 
+// -- Auth Registration --
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { email, password, name, role, phone, address } = req.body;
+    
+    if (!email || !password || !name || !role) {
+      return res.status(400).json({ error: "Missing required fields: email, password, name, role" });
+    }
+
+    let normalizedRole = role.toLowerCase();
+    if (normalizedRole === 'farmer') normalizedRole = 'farmer';
+    else if (normalizedRole === 'buyer') normalizedRole = 'buyer';
+    else if (['transport_driver', 'transporter', 'driver'].includes(normalizedRole)) normalizedRole = 'transporter';
+    else normalizedRole = 'buyer';
+
+    const existingUser = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: "An account with this email address already exists. Please log in." });
+    }
+
+    const passwordHash = hashPassword(password);
+    const uid = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    const result = await db.insert(users).values({
+      uid,
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      role: normalizedRole,
+      name,
+      phone: phone || null,
+      address: address || null,
+    }).returning();
+
+    const newUser = result[0];
+    const token = generateToken({
+      uid: newUser.uid,
+      email: newUser.email,
+      role: newUser.role,
+      name: newUser.name
+    });
+
+    res.json({
+      token,
+      user: {
+        id: newUser.id,
+        uid: newUser.uid,
+        email: newUser.email,
+        role: newUser.role,
+        name: newUser.name,
+        phone: newUser.phone,
+        address: newUser.address
+      }
+    });
+  } catch (error: any) {
+    console.error("Registration error:", error);
+    res.status(500).json({ error: error.message || "Failed to register user" });
+  }
+});
+
+// -- Auth Login --
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const dbUsers = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+    if (dbUsers.length === 0) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const user = dbUsers[0];
+    if (user.passwordHash) {
+      const isMatch = verifyPassword(password, user.passwordHash);
+      if (!isMatch) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+    }
+
+    const token = generateToken({
+      uid: user.uid,
+      email: user.email,
+      role: user.role,
+      name: user.name
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        uid: user.uid,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        phone: user.phone,
+        address: user.address
+      }
+    });
+  } catch (error: any) {
+    console.error("Login error:", error);
+    res.status(500).json({ error: error.message || "Failed to log in" });
+  }
+});
+
+// -- Current User Profile --
+app.get("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    if (!req.dbUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const { passwordHash, ...safeUser } = req.dbUser;
+    res.json(safeUser);
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
 // -- Auth Sync --
 app.post("/api/auth/sync", requireAuth, async (req: AuthRequest, res) => {
   try {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
     const { name, role } = req.body;
     
+    let normalizedRole = role ? role.toLowerCase() : undefined;
+    if (normalizedRole === 'transport_driver') normalizedRole = 'transporter';
+
     const updateData: any = {
       email: req.user.email || '',
     };
-    if (role) {
-      updateData.role = role;
+    if (normalizedRole) {
+      updateData.role = normalizedRole;
     }
     
     const result = await db.insert(users)
       .values({
         uid: req.user.uid,
         email: req.user.email || '',
-        name: name || req.user.name || 'User',
-        role: role || 'buyer',
+        name: name || req.user.name || 'Farmora User',
+        role: normalizedRole || 'buyer',
       })
       .onConflictDoUpdate({
         target: users.uid,
@@ -291,7 +413,7 @@ app.post("/api/ai/chat", async (req, res) => {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = `You are Farmora's Multilingual Agricultural Assistant (SIH26132 platform). 
+    const prompt = `You are Farmora's Multilingual Agricultural Assistant. 
 Help Indian farmers, buyers, and transporters with Mandi prices, crop listing, SELL/STORE/AGGREGATE market decisions, FPO pooling, cold storage, and GPS delivery tracking.
 Please reply in ${langName}. Keep your answer friendly, accurate, practical, and concise (2-4 sentences max).
 
@@ -311,7 +433,7 @@ User Question: ${message}`;
   }
 });
 
-// -- SIH26132 Ecosystem API Endpoints --
+// -- Farmora Ecosystem API Endpoints --
 
 // Mandi Intelligence
 app.get("/api/market/intelligence", async (req, res) => {

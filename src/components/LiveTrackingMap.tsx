@@ -1,37 +1,61 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { Truck, MapPin, Play, Pause, RefreshCw, Navigation, ShieldCheck } from 'lucide-react';
+import { Truck, MapPin, Play, Pause, RefreshCw, Navigation, ShieldCheck, CheckCircle2, Building, Warehouse } from 'lucide-react';
 
 interface LiveTrackingMapProps {
   farmerLocationName?: string;
   buyerLocationName?: string;
   transporterName?: string;
   status?: string;
+  pathType?: 'Farmer → Buyer' | 'Farmer → FPO' | 'Farmer → Storehouse' | string;
+  qualityVerified?: boolean;
 }
 
 export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
-  farmerLocationName = 'Green Acres Farm, Willamette Valley, OR',
-  buyerLocationName = 'Wholesale Depot Hub #4, Seattle, WA',
-  transporterName = 'Express Highway Logistics (Driver: Mark)',
-  status = 'IN_TRANSIT'
+  farmerLocationName = 'Central Agro Zone, Nashik, Maharashtra',
+  buyerLocationName = 'Mumbai Central Wholesale Depot, Maharashtra',
+  transporterName = 'Express Kisan Freight (Driver: Ramesh Shinde)',
+  status = 'IN_TRANSIT',
+  pathType = 'Farmer → Buyer',
+  qualityVerified = false
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
 
   const [isSimulating, setIsSimulating] = useState(true);
-  const [progressIndex, setProgressIndex] = useState(0.5); // 0 to 1 along route
-  const [currentSpeed, setCurrentSpeed] = useState(62); // mph
+  const [progressIndex, setProgressIndex] = useState(0.45); // 0 to 1 along route
+  const [currentSpeed, setCurrentSpeed] = useState(58); // km/h
 
-  // Route Coordinates (Willamette Valley, OR to Seattle, WA)
-  const routePoints: [number, number][] = [
-    [45.0, -123.0],   // Farmer Pickup (Willamette Valley, OR)
-    [45.5152, -122.6784], // Portland, OR
-    [46.1382, -122.9382], // Longview, WA
-    [46.9654, -122.9007], // Olympia, WA
-    [47.2529, -122.4443], // Tacoma, WA
-    [47.6062, -122.3321]  // Buyer Depot (Seattle, WA)
-  ];
+  // Indian Agricultural Transport Routes
+  const getRoutePoints = (): [number, number][] => {
+    if (pathType.includes('FPO')) {
+      return [
+        [18.5204, 73.8567], // Pune Farm Pickup
+        [18.7557, 73.4091], // Lonavala Transit
+        [19.0330, 73.0297], // Navi Mumbai Hub
+        [19.2183, 72.9781]  // Thane Regional FPO Aggregation Hub
+      ];
+    } else if (pathType.includes('Storehouse') || pathType.includes('Storage')) {
+      return [
+        [16.7050, 74.2433], // Kolhapur Farm Pickup
+        [17.2854, 74.1830], // Karad Highway
+        [17.6805, 74.0183], // Satara
+        [18.5204, 73.8567]  // Cold Storage Warehouse, Pune
+      ];
+    } else {
+      // Default: Farmer → Buyer (Nashik to Mumbai)
+      return [
+        [20.0100, 73.7900], // Nashik Farm Pickup
+        [19.7000, 73.5500], // Igatpuri Express
+        [19.6400, 73.4800], // Kasara Ghat
+        [19.2183, 72.9781], // Thane Toll
+        [19.0760, 72.8777]  // Mumbai Central Depot
+      ];
+    }
+  };
+
+  const routePoints = getRoutePoints();
 
   // Calculate interpolated coordinate along route
   const getInterpolatedCoord = (ratio: number): [number, number] => {
@@ -54,11 +78,14 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Initialize Leaflet map
+    // Center map on route mid point
+    const midLat = (routePoints[0][0] + routePoints[routePoints.length - 1][0]) / 2;
+    const midLng = (routePoints[0][1] + routePoints[routePoints.length - 1][1]) / 2;
+
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current, {
-        center: [46.3, -122.7],
-        zoom: 7,
+        center: [midLat, midLng],
+        zoom: 9,
         zoomControl: false
       });
 
@@ -75,7 +102,7 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       const farmerHtmlIcon = L.divIcon({
         className: 'custom-map-icon',
         html: `
-          <div style="background:#065f46; color:white; padding:6px; border-radius:50%; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-center; width:34px; height:34px;">
+          <div style="background:#065f46; color:white; padding:6px; border-radius:50%; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; width:34px; height:34px; font-size:16px;">
             🌱
           </div>
         `,
@@ -83,11 +110,12 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         iconAnchor: [17, 17]
       });
 
+      const destinationIconEmoji = pathType.includes('FPO') ? '🏬' : pathType.includes('Storehouse') ? '🏭' : '🏬';
       const buyerHtmlIcon = L.divIcon({
         className: 'custom-map-icon',
         html: `
-          <div style="background:#022c22; color:white; padding:6px; border-radius:50%; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-center; width:34px; height:34px;">
-            🏬
+          <div style="background:#022c22; color:white; padding:6px; border-radius:50%; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; width:34px; height:34px; font-size:16px;">
+            ${destinationIconEmoji}
           </div>
         `,
         iconSize: [34, 34],
@@ -97,7 +125,7 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       const driverHtmlIcon = L.divIcon({
         className: 'custom-map-icon',
         html: `
-          <div style="background:#10b981; color:white; padding:6px; border-radius:50%; border:2px solid white; box-shadow:0 0 15px #10b981; display:flex; align-items:center; justify-center; width:40px; height:40px; transform: scale(1.1);">
+          <div style="background:#10b981; color:white; padding:6px; border-radius:50%; border:2px solid white; box-shadow:0 0 15px #10b981; display:flex; align-items:center; justify-content:center; width:40px; height:40px; transform: scale(1.1); font-size:18px;">
             🚚
           </div>
         `,
@@ -110,16 +138,16 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         .addTo(map)
         .bindPopup(`<b>🌱 Farmer Pickup</b><br/>${farmerLocationName}`);
 
-      // Buyer Marker
+      // Buyer / Destination Marker
       L.marker(routePoints[routePoints.length - 1], { icon: buyerHtmlIcon })
         .addTo(map)
-        .bindPopup(`<b>🏬 Buyer Destination</b><br/>${buyerLocationName}`);
+        .bindPopup(`<b>${destinationIconEmoji} Destination (${pathType})</b><br/>${buyerLocationName}`);
 
       // Route Polyline
       L.polyline(routePoints, {
         color: '#10b981',
         weight: 5,
-        opacity: 0.8,
+        opacity: 0.85,
         dashArray: '8, 8'
       }).addTo(map);
 
@@ -140,7 +168,7 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
 
     const interval = setInterval(() => {
       setProgressIndex(prev => {
-        const next = prev + 0.01;
+        const next = prev + 0.008;
         const bounded = next > 0.95 ? 0.05 : next;
 
         if (driverMarkerRef.current) {
@@ -150,7 +178,7 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
         return bounded;
       });
 
-      setCurrentSpeed(Math.floor(58 + Math.random() * 8));
+      setCurrentSpeed(Math.floor(52 + Math.random() * 10));
     }, 1000);
 
     return () => clearInterval(interval);
@@ -174,10 +202,20 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           </span>
         </div>
 
+        <div className="flex items-center justify-between bg-[#e1f2e6] px-2.5 py-1 rounded-lg border border-[#10b981]/30 text-[11px] font-black text-[#065f46]">
+          <span>Path: {pathType}</span>
+          {qualityVerified && (
+            <span className="flex items-center gap-1 text-emerald-800 bg-white px-2 py-0.5 rounded text-[10px]">
+              <CheckCircle2 className="w-3 h-3 text-[#10b981]" />
+              Verified
+            </span>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-2 text-[11px] font-medium text-[#065f46]">
           <div>
-            <span className="text-[#065f46]/60 block text-[9px] uppercase font-bold">Driver Speed</span>
-            <strong className="text-[#10b981] font-mono text-sm">{currentSpeed} mph</strong>
+            <span className="text-[#065f46]/60 block text-[9px] uppercase font-bold">Vehicle Speed</span>
+            <strong className="text-[#10b981] font-mono text-sm">{currentSpeed} km/h</strong>
           </div>
           <div>
             <span className="text-[#065f46]/60 block text-[9px] uppercase font-bold">Route Progress</span>
@@ -195,7 +233,7 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
       <div className="absolute bottom-4 left-4 right-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-2 bg-white/90 backdrop-blur-xl p-3 rounded-2xl border border-[#10b981]/30 shadow-lg text-xs text-[#065f46]">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-[#10b981] animate-ping"></div>
-          <span className="font-bold">Live Driver Position Updating Every 1s</span>
+          <span className="font-bold">Driver Position Updating Live</span>
         </div>
 
         <div className="flex items-center gap-2">

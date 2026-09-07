@@ -2,9 +2,11 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import { LandingPage } from './pages/LandingPage.tsx';
+import { AuthPage } from './pages/AuthPage.tsx';
 import { FarmerDashboard } from './pages/FarmerDashboard.tsx';
 import { BuyerDashboard } from './pages/BuyerDashboard.tsx';
 import { TransporterDashboard } from './pages/TransporterDashboard.tsx';
+import { ProtectedRoute } from './components/ProtectedRoute.tsx';
 import { MultilingualVoiceBar } from './components/MultilingualVoiceBar.tsx';
 
 export default function App() {
@@ -13,9 +15,35 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/farmer" element={<FarmerDashboard />} />
-          <Route path="/buyer" element={<BuyerDashboard />} />
-          <Route path="/transporter" element={<TransporterDashboard />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/login" element={<AuthPage />} />
+
+          <Route
+            path="/farmer"
+            element={
+              <ProtectedRoute allowedRoles={['farmer', 'FARMER']}>
+                <FarmerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/buyer"
+            element={
+              <ProtectedRoute allowedRoles={['buyer', 'BUYER']}>
+                <BuyerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/transporter"
+            element={
+              <ProtectedRoute allowedRoles={['transporter', 'TRANSPORT_DRIVER', 'driver']}>
+                <TransporterDashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
         <MultilingualVoiceBar />
       </BrowserRouter>

@@ -4,8 +4,9 @@ import { integer, pgTable, serial, text, timestamp, doublePrecision, boolean } f
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  uid: text('uid').notNull().unique(), // Firebase Auth UID
+  uid: text('uid').notNull().unique(), // Auth UID / User Identifier
   email: text('email').notNull(),
+  passwordHash: text('password_hash'),
   role: text('role').notNull().default('buyer'), // farmer, buyer, transporter, admin
   name: text('name').notNull(),
   phone: text('phone'),
@@ -79,7 +80,15 @@ export const trackingUpdates = pgTable('tracking_updates', {
   timestamp: timestamp('timestamp').defaultNow(),
 });
 
-// --- SIH26132 Schema Additions ---
+export const messages = pgTable('messages', {
+  id: serial('id').primaryKey(),
+  senderId: integer('sender_id').references(() => users.id).notNull(),
+  receiverId: integer('receiver_id').references(() => users.id).notNull(),
+  content: text('content').notNull(),
+  timestamp: timestamp('timestamp').defaultNow(),
+});
+
+// --- Ecosystem Schema Additions ---
 
 export const mandiPrices = pgTable('mandi_prices', {
   id: serial('id').primaryKey(),
@@ -209,6 +218,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   buyerRequests: many(buyerRequests),
   buyerDemands: many(buyerDemands),
   storageBookings: many(storageBookings),
+  sentMessages: many(messages, { relationName: 'sentMessages' }),
+  receivedMessages: many(messages, { relationName: 'receivedMessages' }),
 }));
 
 export const cropsRelations = relations(crops, ({ one, many }) => ({
@@ -305,4 +316,17 @@ export const transportRequestsRelations = relations(transportRequests, ({ one, m
     references: [users.id],
   }),
   trackingUpdates: many(trackingUpdates),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+    relationName: 'sentMessages'
+  }),
+  receiver: one(users, {
+    fields: [messages.receiverId],
+    references: [users.id],
+    relationName: 'receivedMessages'
+  }),
 }));

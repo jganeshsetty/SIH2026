@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
+import { AuthModal } from '../components/AuthModal.tsx';
 import { 
   Sprout, 
   ShoppingBag, 
@@ -28,7 +29,9 @@ import {
   ArrowUpRight,
   BellRing,
   Lock,
-  CheckCircle2
+  CheckCircle2,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -36,6 +39,7 @@ export const LandingPage: React.FC = () => {
   const { user, appUser, signInWithGoogle, logout } = useAuth();
   const [signingInRole, setSigningInRole] = useState<'farmer' | 'buyer' | 'transporter' | null>(null);
   const [activeStrategyTab, setActiveStrategyTab] = useState<'SELL' | 'STORE' | 'AGGREGATE'>('SELL');
+  const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: 'login' | 'register' }>({ isOpen: false, mode: 'register' });
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   // Smooth scroll-triggered video playback
@@ -141,7 +145,7 @@ export const LandingPage: React.FC = () => {
                 FARMORA
               </span>
               <span className="text-xs font-bold text-emerald-700 tracking-wider block mt-0.5">
-                Smart Agro Platform • SIH 2026
+                Smart Agro & Market Platform
               </span>
             </div>
           </div>
@@ -182,17 +186,24 @@ export const LandingPage: React.FC = () => {
               </div>
             ) : null}
 
+            {!user && (
+              <div className="hidden sm:flex items-center gap-2">
+                <button 
+                  onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer border border-emerald-300"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Register</span>
+                </button>
+              </div>
+            )}
+
             <button 
-              onClick={() => handleRoleSelect('farmer')}
-              disabled={!!signingInRole}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-700 shadow-md transition-all flex items-center gap-2 cursor-pointer"
+              onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
+              className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-emerald-800 hover:bg-emerald-700 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              {signingInRole === 'farmer' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Sprout className="w-3.5 h-3.5" />
-              )}
-              <span>Farmer Sign In</span>
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Log In</span>
             </button>
           </div>
         </div>
@@ -210,7 +221,7 @@ export const LandingPage: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-xl border border-emerald-600/30 shadow-xs mb-6">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-ping"></span>
             <span className="text-xs font-bold text-emerald-900">
-              SIH 2026 Innovation • Market Intelligence, Decision & Trade Enablement
+              Agricultural Platform • Market Intelligence, Decision & Trade Enablement
             </span>
           </div>
 
@@ -237,31 +248,21 @@ export const LandingPage: React.FC = () => {
             
             {/* Primary Action: Solid Focal Point */}
             <button
-              onClick={() => handleRoleSelect('farmer')}
-              disabled={!!signingInRole}
+              onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-emerald-800 hover:bg-emerald-700 text-white text-base font-bold shadow-xl hover:shadow-2xl hover:scale-102 transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer"
             >
-              {signingInRole === 'farmer' ? (
-                <Loader2 className="w-5 h-5 animate-spin text-white" />
-              ) : (
-                <Sprout className="w-5 h-5 text-emerald-200" />
-              )}
-              <span>Start Selling as a Farmer</span>
+              <UserPlus className="w-5 h-5 text-emerald-200" />
+              <span>Register for Farmora</span>
               <ArrowRight className="w-4 h-4 text-emerald-300" />
             </button>
 
             {/* Secondary Action: Distinct Outline Style */}
             <button
-              onClick={() => handleRoleSelect('buyer')}
-              disabled={!!signingInRole}
+              onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
               className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-white/95 hover:bg-white text-emerald-950 text-base font-bold border-2 border-emerald-600/30 hover:border-emerald-600 shadow-sm transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer"
             >
-              {signingInRole === 'buyer' ? (
-                <Loader2 className="w-5 h-5 animate-spin text-emerald-700" />
-              ) : (
-                <ShoppingBag className="w-5 h-5 text-emerald-700" />
-              )}
-              <span>Browse as a Buyer</span>
+              <LogIn className="w-5 h-5 text-emerald-700" />
+              <span>Login to Farmora</span>
               <ArrowUpRight className="w-4 h-4 text-emerald-700" />
             </button>
           </div>
@@ -1374,7 +1375,7 @@ export const LandingPage: React.FC = () => {
                 From harvest to market, smarter. AI-powered agricultural intelligence, decision support, and direct trade enablement.
               </p>
               <span className="inline-block text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-md border border-emerald-600/25">
-                SIH 2026 Problem Statement SIH26132
+                Smart Agriculture & Direct Market Platform
               </span>
             </div>
 
@@ -1404,7 +1405,7 @@ export const LandingPage: React.FC = () => {
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">Ecosystem</h3>
               <ul className="space-y-2 text-xs font-semibold text-slate-600">
                 <li><button onClick={() => scrollToSection('how-it-works')} className="hover:text-emerald-700 cursor-pointer">8-Step Execution Flow</button></li>
-                <li><button onClick={() => scrollToSection('journey')} className="hover:text-emerald-700 cursor-pointer">Demo Case Study</button></li>
+                <li><button onClick={() => scrollToSection('journey')} className="hover:text-emerald-700 cursor-pointer">Platform Case Study</button></li>
                 <li><button onClick={() => scrollToSection('about')} className="hover:text-emerald-700 cursor-pointer">About Farmora</button></li>
                 <li><button onClick={() => scrollToSection('impact')} className="hover:text-emerald-700 cursor-pointer">Platform Impact</button></li>
               </ul>
@@ -1419,6 +1420,13 @@ export const LandingPage: React.FC = () => {
 
         </div>
       </footer>
+
+      {/* Auth Modal Overlay */}
+      <AuthModal 
+        isOpen={authModal.isOpen} 
+        onClose={() => setAuthModal(prev => ({ ...prev, isOpen: false }))} 
+        initialMode={authModal.mode} 
+      />
 
     </div>
   );
