@@ -1,4 +1,4 @@
-import { Crop, BuyerDemand, MatchingResult, FPOBulkOffer } from '../types.ts';
+import { Crop, BuyerDemand, MatchingResult, FPOBulkOffer } from '../types';
 
 /**
  * Calculates straight-line distance in kilometers between two lat/lng pairs using the Haversine formula.

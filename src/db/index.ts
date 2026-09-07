@@ -1,7 +1,7 @@
 // src/db/index.ts
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import * as schema from './schema.ts';
+import * as schema from './schema';
 
 const { Pool } = pg;
 
@@ -15,6 +15,7 @@ export const createPool = () => {
     
     if (connectionString) {
       const needsSsl = process.env.NODE_ENV === 'production' || 
+                       process.env.VERCEL === '1' ||
                        connectionString.includes('sslmode=require') || 
                        connectionString.includes('neon.tech') || 
                        connectionString.includes('supabase') ||

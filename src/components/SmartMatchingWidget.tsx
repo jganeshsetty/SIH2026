@@ -1,6 +1,6 @@
 import React from 'react';
-import { Crop, BuyerDemand, FPOBulkOffer, MatchingResult } from '../types.ts';
-import { computeSmartMatchScore } from '../services/smartMatching.ts';
+import { Crop, BuyerDemand, FPOBulkOffer, MatchingResult } from '../types';
+import { computeSmartMatchScore } from '../services/smartMatching';
 import { Target, CheckCircle2, MapPin, Calendar, DollarSign, Award, ArrowRight } from 'lucide-react';
 
 interface Props {

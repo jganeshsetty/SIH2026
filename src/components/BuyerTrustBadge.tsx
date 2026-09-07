@@ -1,6 +1,6 @@
 import React from 'react';
-import { BuyerTrustProfile } from '../types.ts';
-import { BENCHMARK_BUYER_TRUST } from '../services/marketData.ts';
+import { BuyerTrustProfile } from '../types';
+import { BENCHMARK_BUYER_TRUST } from '../services/marketData';
 import { ShieldCheck, Star, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Props {

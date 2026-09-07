@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MandiPrice } from '../types.ts';
-import { getMandiIntelligence } from '../services/marketData.ts';
+import { MandiPrice } from '../types';
+import { getMandiIntelligence } from '../services/marketData';
 import { TrendingUp, TrendingDown, MapPin, BarChart3, AlertCircle, Building2 } from 'lucide-react';
 
 interface Props {

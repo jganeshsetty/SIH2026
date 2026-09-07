@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext.tsx';
-import { Button } from './ui/button.tsx';
-import { Input } from './ui/input.tsx';
-import { Label } from './ui/label.tsx';
-import { Crop } from '../types.ts';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Crop } from '../types';
 
 export function BuyerRequestForm({ crop, onComplete }: { crop: Crop, onComplete: () => void }) {
   const { token } = useAuth();

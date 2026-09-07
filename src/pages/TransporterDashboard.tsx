@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.tsx';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Truck, 
   MapPin, 
@@ -18,8 +18,10 @@ import {
   Upload,
   AlertCircle
 } from 'lucide-react';
-import { LiveTrackingMap } from '../components/LiveTrackingMap.tsx';
-import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
+import { LiveTrackingMap } from '../components/LiveTrackingMap';
+import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export interface DeliveryRequest {
   id: number;
@@ -95,7 +97,19 @@ const INITIAL_REQUESTS: DeliveryRequest[] = [
 export const TransporterDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, appUser, logout } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'available' | 'active'>('available');
+
+  // Voice navigation listener
+  useEffect(() => {
+    const handleVoiceNav = (e: any) => {
+      const target = e.detail?.tab;
+      if (target === 'requests' || target === 'available') setActiveTab('available');
+      else if (target === 'route' || target === 'active' || target === 'transport') setActiveTab('active');
+    };
+    window.addEventListener('farmora_voice_tab_navigate', handleVoiceNav);
+    return () => window.removeEventListener('farmora_voice_tab_navigate', handleVoiceNav);
+  }, []);
 
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>(() => {
     try {
@@ -236,14 +250,18 @@ export const TransporterDashboard: React.FC = () => {
                   FARMORA TRANSPORT PORTAL
                 </span>
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
-                  Freight Driver
+                  {t('transporter.freightBadge', 'Freight Driver')}
                 </span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">Agricultural Transportation Hub</h1>
+              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">
+                {t('transporter.portalTitle', 'Agricultural Transportation Hub')}
+              </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
+            <LanguageSelector />
+
             {appUser || user ? (
               <div className="flex items-center gap-2 bg-[#e1f2e6] px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-xs">
                 <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs">
@@ -261,7 +279,7 @@ export const TransporterDashboard: React.FC = () => {
                   className="p-1.5 rounded-xl text-[#065f46] hover:bg-rose-100 hover:text-rose-600 transition-colors ml-1 flex items-center gap-1 font-bold text-xs"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span className="hidden md:inline">Logout</span>
+                  <span className="hidden md:inline">{t('common.logout', 'Logout')}</span>
                 </button>
               </div>
             ) : null}
@@ -280,7 +298,7 @@ export const TransporterDashboard: React.FC = () => {
               }`}
             >
               <Truck className="w-4 h-4 text-[#10b981]" />
-              <span>Available Delivery Offers ({deliveries.filter(d => !d.isAccepted).length})</span>
+              <span>{t('transporter.tabRequests', 'Available Delivery Offers')} ({deliveries.filter(d => !d.isAccepted).length})</span>
             </button>
 
             <button
@@ -292,7 +310,7 @@ export const TransporterDashboard: React.FC = () => {
               }`}
             >
               <Navigation className="w-4 h-4 text-[#10b981]" />
-              <span>Active Dispatch {activeDelivery ? '(1 Active)' : ''}</span>
+              <span>{t('transporter.tabRoute', 'Active Dispatch')} {activeDelivery ? '(1 Active)' : ''}</span>
             </button>
           </div>
         </div>

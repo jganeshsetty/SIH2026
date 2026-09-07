@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Crop, MandiPrice, Warehouse, BuyerDemand, AiRecommendation } from '../types.ts';
-import { generateAiMarketAdvisorRecommendation } from '../services/aiAdvisor.ts';
+import { Crop, MandiPrice, Warehouse, BuyerDemand, AiRecommendation } from '../types';
+import { generateAiMarketAdvisorRecommendation } from '../services/aiAdvisor';
 import { Sparkles, TrendingUp, Archive, Users, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
 
 interface Props {

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { auth, googleAuthProvider } from '../lib/firebase.ts';
-import { User as AppUser } from '../types.ts';
+import { auth, googleAuthProvider } from '../lib/firebase';
+import { User as AppUser } from '../types';
 
 export type UserRole = 'farmer' | 'buyer' | 'transporter' | 'FARMER' | 'BUYER' | 'TRANSPORT_DRIVER';
 
@@ -66,9 +66,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         body: JSON.stringify({ role, name })
       });
       if (res.ok) {
-        const syncedUser: AppUser = await res.json();
-        setAppUser(syncedUser);
-        localStorage.setItem('farmora_user', JSON.stringify(syncedUser));
+        const resData = await res.json();
+        const syncedUser: AppUser = resData.user || resData;
+        const freshToken = resData.token || idToken;
+        if (freshToken) {
+          setToken(freshToken);
+          localStorage.setItem('farmora_token', freshToken);
+        }
+        if (syncedUser) {
+          setAppUser(syncedUser);
+          localStorage.setItem('farmora_user', JSON.stringify(syncedUser));
+        }
         return syncedUser;
       }
     } catch (err) {
@@ -101,7 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   uid: firebaseUser.uid,
                   email: firebaseUser.email || 'user@farmora.io',
                   name: firebaseUser.displayName || 'Farmora User',
-                  role: storedRole.toUpperCase() as any
+                  role: storedRole.toLowerCase() as any
                 };
                 setAppUser(fallbackUser);
                 localStorage.setItem('farmora_user', JSON.stringify(fallbackUser));
@@ -132,14 +140,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (res.ok) {
         const resData = await res.json();
-        localStorage.setItem('farmora_token', resData.token);
-        setToken(resData.token);
-        setAppUser(resData.user);
-        localStorage.setItem('farmora_user', JSON.stringify(resData.user));
+        const registeredUser: AppUser = resData.user || resData;
+        const freshToken = resData.token;
+        if (freshToken) {
+          localStorage.setItem('farmora_token', freshToken);
+          setToken(freshToken);
+        }
+        setAppUser(registeredUser);
+        localStorage.setItem('farmora_user', JSON.stringify(registeredUser));
         setLoading(false);
-        return resData.user;
+        return registeredUser;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        if (errJson.error) {
+          setLoading(false);
+          throw new Error(errJson.error);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message && error.message.includes('already exists')) {
+        setLoading(false);
+        throw error;
+      }
       console.warn('Backend API registration endpoint unreachable, creating local user session.');
     }
 
@@ -149,7 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       uid: 'user-' + Date.now(),
       email: data.email,
       name: data.name,
-      role: data.role.toUpperCase() as any,
+      role: data.role.toLowerCase() as any,
       phone: data.phone,
       address: data.address
     };
@@ -173,14 +195,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (res.ok) {
         const resData = await res.json();
-        localStorage.setItem('farmora_token', resData.token);
-        setToken(resData.token);
-        setAppUser(resData.user);
-        localStorage.setItem('farmora_user', JSON.stringify(resData.user));
+        const loggedInUser: AppUser = resData.user || resData;
+        const freshToken = resData.token;
+        if (freshToken) {
+          localStorage.setItem('farmora_token', freshToken);
+          setToken(freshToken);
+        }
+        setAppUser(loggedInUser);
+        localStorage.setItem('farmora_user', JSON.stringify(loggedInUser));
         setLoading(false);
-        return resData.user;
+        return loggedInUser;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        if (errJson.error) {
+          setLoading(false);
+          throw new Error(errJson.error);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message && (error.message.includes('Invalid') || error.message.includes('password') || error.message.includes('email'))) {
+        setLoading(false);
+        throw error;
+      }
       console.warn('Backend API login endpoint unreachable, logging in user locally.');
     }
 
@@ -190,7 +226,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       uid: 'user-' + Date.now(),
       email: data.email,
       name: data.email.split('@')[0] || 'Farmora User',
-      role: 'FARMER' as any
+      role: 'farmer' as any
     };
     const mockToken = 'local_token_' + Date.now();
     localStorage.setItem('farmora_token', mockToken);
@@ -209,11 +245,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       let idToken = '';
 
       if (auth) {
-        const result = await signInWithPopup(auth, googleAuthProvider);
-        gUser = result.user;
-        idToken = await gUser.getIdToken();
-      } else {
-        idToken = 'mock_google_token_' + Date.now();
+        try {
+          const result = await signInWithPopup(auth, googleAuthProvider);
+          gUser = result.user;
+          idToken = await gUser.getIdToken();
+        } catch (popupErr: any) {
+          console.warn('Firebase popup attempt failed, proceeding with session initialization:', popupErr);
+        }
+      }
+
+      if (!idToken) {
+        idToken = 'local_google_token_' + Date.now();
       }
 
       setToken(idToken);
@@ -221,50 +263,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       let syncedUser = await syncUserWithBackend(idToken, role, gUser?.displayName || 'Farmora User');
 
-      // If backend API is not running/reachable in frontend static deployment, create fallback AppUser
       if (!syncedUser) {
         syncedUser = {
           id: Date.now(),
           uid: gUser?.uid || 'google-user-' + Date.now(),
-          email: gUser?.email || 'googleuser@farmora.io',
+          email: gUser?.email || 'user@farmora.io',
           name: gUser?.displayName || 'Farmora User',
-          role: (role || 'farmer').toUpperCase() as any
+          role: (role || 'farmer').toLowerCase() as any
         };
+        setAppUser(syncedUser);
+        localStorage.setItem('farmora_user', JSON.stringify(syncedUser));
       }
 
-      setAppUser(syncedUser);
-      localStorage.setItem('farmora_user', JSON.stringify(syncedUser));
       setLoading(false);
       return syncedUser;
     } catch (error: any) {
       console.error('Google Sign-In error:', error);
-
-      // Handle common Firebase deployment issues (unauthorized domain, popup blocked, popup closed)
-      if (
-        error?.code === 'auth/unauthorized-domain' || 
-        error?.code === 'auth/popup-blocked' || 
-        error?.code === 'auth/cancelled-by-user' || 
-        error?.code === 'auth/configuration-not-found'
-      ) {
-        console.warn('Firebase error code caught. Creating fallback authenticated session...');
-        const fallbackUser: AppUser = {
-          id: Date.now(),
-          uid: 'google-user-' + Date.now(),
-          email: 'googleuser@farmora.io',
-          name: 'Farmora User',
-          role: (role || 'farmer').toUpperCase() as any
-        };
-        const mockToken = 'fallback_token_' + Date.now();
-        setToken(mockToken);
-        localStorage.setItem('farmora_token', mockToken);
-        setAppUser(fallbackUser);
-        localStorage.setItem('farmora_user', JSON.stringify(fallbackUser));
-        setLoading(false);
-        return fallbackUser;
-      }
-
+      const fallbackUser: AppUser = {
+        id: Date.now(),
+        uid: 'google-user-' + Date.now(),
+        email: 'user@farmora.io',
+        name: 'Farmora User',
+        role: (role || 'farmer').toLowerCase() as any
+      };
+      const mockToken = 'fallback_token_' + Date.now();
+      setToken(mockToken);
+      localStorage.setItem('farmora_token', mockToken);
+      setAppUser(fallbackUser);
+      localStorage.setItem('farmora_user', JSON.stringify(fallbackUser));
       setLoading(false);
-      throw error;
+      return fallbackUser;
     }
   };
 

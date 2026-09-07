@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.tsx';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Sprout, 
   PlusCircle, 
@@ -22,17 +22,19 @@ import {
   Lock,
   ShieldCheck
 } from 'lucide-react';
-import { LiveTrackingMap } from '../components/LiveTrackingMap.tsx';
-import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
-import { MarketIntelligenceModule } from '../components/MarketIntelligenceModule.tsx';
-import { SmartMatchingWidget } from '../components/SmartMatchingWidget.tsx';
-import { AiMarketAdvisorCard } from '../components/AiMarketAdvisorCard.tsx';
-import { FpoManagementModule } from '../components/FpoManagementModule.tsx';
-import { StorageDiscoveryModule } from '../components/StorageDiscoveryModule.tsx';
-import { EcosystemMapView } from '../components/EcosystemMapView.tsx';
-import { ChatWidget } from '../components/ChatWidget.tsx';
-import { BENCHMARK_MANDI_PRICES, BENCHMARK_WAREHOUSES, BENCHMARK_BUYER_DEMANDS } from '../services/marketData.ts';
-import { Crop as AppCrop } from '../types.ts';
+import { LiveTrackingMap } from '../components/LiveTrackingMap';
+import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground';
+import { MarketIntelligenceModule } from '../components/MarketIntelligenceModule';
+import { SmartMatchingWidget } from '../components/SmartMatchingWidget';
+import { AiMarketAdvisorCard } from '../components/AiMarketAdvisorCard';
+import { FpoManagementModule } from '../components/FpoManagementModule';
+import { StorageDiscoveryModule } from '../components/StorageDiscoveryModule';
+import { EcosystemMapView } from '../components/EcosystemMapView';
+import { ChatWidget } from '../components/ChatWidget';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../i18n/LanguageContext';
+import { BENCHMARK_MANDI_PRICES, BENCHMARK_WAREHOUSES, BENCHMARK_BUYER_DEMANDS } from '../services/marketData';
+import { Crop as AppCrop } from '../types';
 
 interface Crop {
   id: number;
@@ -73,9 +75,22 @@ interface DeliveryOrder {
 export const FarmerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, appUser, logout } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<
     'add-crop' | 'advisor' | 'buyers' | 'storage' | 'fpo' | 'demands' | 'map' | 'delivery'
   >('add-crop');
+
+  // Listen for voice assistant tab navigation events
+  useEffect(() => {
+    const handleVoiceNav = (e: any) => {
+      const target = e.detail?.tab;
+      if (target && ['add-crop', 'advisor', 'buyers', 'storage', 'fpo', 'demands', 'map', 'delivery'].includes(target)) {
+        setActiveTab(target);
+      }
+    };
+    window.addEventListener('farmora_voice_tab_navigate', handleVoiceNav);
+    return () => window.removeEventListener('farmora_voice_tab_navigate', handleVoiceNav);
+  }, []);
 
   // Form State
   const [cropName, setCropName] = useState('Tomato');
@@ -248,14 +263,14 @@ export const FarmerDashboard: React.FC = () => {
   };
 
   const navItems = [
-    { id: 'add-crop', label: '1. Add Crop', icon: PlusCircle },
-    { id: 'advisor', label: '2. AI Analysis', icon: Sparkles },
-    { id: 'buyers', label: `3. Buyers (${offers.length})`, icon: FileText },
-    { id: 'storage', label: '4. Storage', icon: Archive },
-    { id: 'fpo', label: '5. FPOs', icon: Users },
-    { id: 'demands', label: '6. Buyer Demands', icon: Target },
-    { id: 'map', label: '7. Maps', icon: MapPin },
-    { id: 'delivery', label: '8. Transportation', icon: Truck }
+    { id: 'add-crop', label: t('farmer.tabAddCrop', '1. Add Harvest'), icon: PlusCircle },
+    { id: 'advisor', label: t('farmer.tabAdvisor', '2. AI Market Advisor'), icon: Sparkles },
+    { id: 'buyers', label: `${t('farmer.tabBuyers', '3. Direct Buyers')} (${offers.length})`, icon: FileText },
+    { id: 'storage', label: t('farmer.tabStorage', '4. Cold Storage'), icon: Archive },
+    { id: 'fpo', label: t('farmer.tabFpo', '5. FPO Aggregation'), icon: Users },
+    { id: 'demands', label: t('farmer.tabDemands', '6. Buyer Demand'), icon: Target },
+    { id: 'map', label: t('farmer.tabMaps', '7. Ecosystem Map'), icon: MapPin },
+    { id: 'delivery', label: t('farmer.tabTransport', '8. Freight Tracking'), icon: Truck }
   ];
 
   return (
@@ -290,15 +305,19 @@ export const FarmerDashboard: React.FC = () => {
                   FARMORA FARMER PORTAL
                 </span>
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
-                  Verified Producer
+                  {t('farmer.verifiedBadge', 'Verified Producer')}
                 </span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">Farmer Intelligence & Trade Hub</h1>
+              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">
+                {t('farmer.portalTitle', 'Farmer Intelligence & Trade Hub')}
+              </h1>
             </div>
           </div>
 
-          {/* User Profile Pill */}
+          {/* User Profile Pill & Global Language Selector */}
           <div className="flex items-center gap-3 self-end sm:self-auto">
+            <LanguageSelector />
+
             {appUser || user ? (
               <div className="flex items-center gap-2 bg-[#e1f2e6] px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-xs">
                 <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs">
@@ -316,7 +335,7 @@ export const FarmerDashboard: React.FC = () => {
                   className="p-1.5 rounded-xl text-[#065f46] hover:bg-rose-100 hover:text-rose-600 transition-colors ml-1 flex items-center gap-1 font-bold text-xs"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span className="hidden md:inline">Logout</span>
+                  <span className="hidden md:inline">{t('common.logout', 'Logout')}</span>
                 </button>
               </div>
             ) : null}
@@ -358,8 +377,8 @@ export const FarmerDashboard: React.FC = () => {
                     <Sprout className="w-6 h-6 text-[#10b981]" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-[#022c22]">List Produce for Market AI Analysis</h2>
-                    <p className="text-xs text-[#065f46] font-semibold">Enter your harvest parameters to trigger instant AGMARKNET price matching and AI Sell/Store decisions.</p>
+                    <h2 className="text-xl font-black text-[#022c22]">{t('farmer.addCropHeading', 'List Produce for Market AI Analysis')}</h2>
+                    <p className="text-xs text-[#065f46] font-semibold">{t('farmer.addCropSubheading', 'Enter your harvest parameters to trigger instant AGMARKNET price matching and AI Sell/Store decisions.')}</p>
                   </div>
                 </div>
 
@@ -380,7 +399,7 @@ export const FarmerDashboard: React.FC = () => {
                 {/* Crop Name & Quality */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Select Crop *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.cropNameLabel', 'Select Crop')} *</label>
                     <select
                       value={cropName}
                       onChange={(e) => setCropName(e.target.value)}
@@ -395,7 +414,7 @@ export const FarmerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Quality / Grade *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.qualityGradeLabel', 'Quality / Grade')} *</label>
                     <select
                       value={quality}
                       onChange={(e) => setQuality(e.target.value)}
@@ -412,7 +431,7 @@ export const FarmerDashboard: React.FC = () => {
                 {/* Quantity, Unit & Expected Price */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Quantity *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.quantityLabel', 'Quantity')} *</label>
                     <input
                       type="number"
                       required
@@ -424,7 +443,7 @@ export const FarmerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Unit *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.unitLabel', 'Unit')} *</label>
                     <select
                       value={unit}
                       onChange={(e) => setUnit(e.target.value)}
@@ -437,7 +456,7 @@ export const FarmerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Cost per Unit (₹) *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.expectedPriceLabel', 'Cost per Unit (₹)')} *</label>
                     <input
                       type="number"
                       required
@@ -460,7 +479,7 @@ export const FarmerDashboard: React.FC = () => {
                 {/* Location & Harvest Date */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Farm Pickup Location & District *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.farmLocationLabel', 'Farm Pickup Location & District')} *</label>
                     <input
                       type="text"
                       required
@@ -471,7 +490,7 @@ export const FarmerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1.5">Harvest / Readiness Date *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.harvestDateLabel', 'Harvest / Readiness Date')} *</label>
                     <input
                       type="date"
                       required
@@ -484,7 +503,7 @@ export const FarmerDashboard: React.FC = () => {
 
                 {/* Description */}
                 <div>
-                  <label className="block text-xs font-black text-[#022c22] mb-1.5">Produce Description & Special Notes</label>
+                  <label className="block text-xs font-black text-[#022c22] mb-1.5">{t('farmer.produceDescriptionLabel', 'Produce Description & Special Notes')}</label>
                   <textarea
                     rows={2}
                     value={description}
@@ -500,7 +519,7 @@ export const FarmerDashboard: React.FC = () => {
                     className="w-full py-4 px-6 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-sm font-black transition-all shadow-xl hover:shadow-[#10b981]/30 flex items-center justify-center gap-2.5 cursor-pointer"
                   >
                     <Sprout className="w-5 h-5 text-[#a7f3d0]" />
-                    <span>List Produce & Run AI Market Decision Check</span>
+                    <span>{t('farmer.submitCropBtn', 'List Produce & Run AI Market Decision Check')}</span>
                   </button>
                 </div>
               </form>
@@ -523,74 +542,274 @@ export const FarmerDashboard: React.FC = () => {
           />
         )}
 
-        {/* PAGE 3: BUYERS (OFFERS & CHAT) */}
+        {/* PAGE 3: BUYERS (CROP UPLOAD TO BUYER PORTAL, LISTINGS & OFFERS) */}
         {activeTab === 'buyers' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            
+            {/* Header Banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/30 shadow-md">
               <div>
-                <h2 className="text-xl font-black text-[#022c22]">Buyer Offers & Direct Sale Requests</h2>
-                <p className="text-xs text-[#065f46] font-semibold">Incoming offers matching your Tomato harvest listing.</p>
+                <span className="text-[10px] font-black text-white bg-[#065f46] px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                  DIRECT WHOLESALE MARKETPLACE
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-[#022c22] mt-1">Farmer-to-Buyer Marketplace & Crop Upload</h2>
+                <p className="text-xs text-[#065f46] font-semibold">Upload your crop details below to publish them directly to the Buyer Portal for wholesale procurement.</p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
-                {offers.length} Active Offer(s)
-              </span>
+
+              <div className="flex items-center gap-2">
+                <span className="px-3.5 py-1.5 rounded-2xl bg-emerald-100 text-emerald-900 text-xs font-black border border-emerald-300">
+                  {crops.length} Crop Listing(s) Published
+                </span>
+                <span className="px-3.5 py-1.5 rounded-2xl bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
+                  {offers.length} Buyer Offer(s) Received
+                </span>
+              </div>
             </div>
 
-            {offers.map((offer) => (
-              <div key={offer.id} className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
-                      OFFER #{offer.id}
-                    </span>
-                    <span className="text-[10px] font-bold text-gray-500">{offer.date}</span>
-                  </div>
-                  <h4 className="text-base font-black text-[#022c22]">{offer.buyerName}</h4>
-                  <p className="text-xs text-[#065f46] font-semibold">
-                    Commodity: <span className="font-bold text-[#022c22]">{offer.cropName}</span> • Requested: <span className="font-bold text-[#022c22]">{offer.offeredQuantity} kg</span> (@ ₹34/kg)
-                  </p>
+            {/* SECTION 1: CROP UPLOAD FORM FOR BUYERS */}
+            <div className="bg-white/95 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border-1.5 border-[#10b981]/35 shadow-xl space-y-6">
+              <div className="flex items-center gap-3 pb-4 border-b border-[#10b981]/20">
+                <div className="w-10 h-10 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/40 flex items-center justify-center text-[#065f46]">
+                  <PlusCircle className="w-5 h-5 text-[#10b981]" />
                 </div>
-
-                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100">
-                  <div>
-                    <span className="text-xs text-gray-500 font-bold block sm:text-right">Total Deal Value</span>
-                    <span className="text-xl font-black text-[#065f46]">₹{offer.offeredPrice.toLocaleString('en-IN')}</span>
-                  </div>
-
-                  {offer.status === 'PENDING' ? (
-                    <div className="flex flex-col gap-2">
-                      <button 
-                        onClick={() => {
-                          setChatRecipient({ id: offer.id, name: offer.buyerName });
-                          setChatOpen(true);
-                        }} 
-                        className="px-4 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        💬 Chat with Buyer
-                      </button>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleOfferAction(offer.id, 'ACCEPTED')} 
-                          className="px-4 py-2 rounded-xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-xs flex-1 cursor-pointer"
-                        >
-                          Accept
-                        </button>
-                        <button 
-                          onClick={() => handleOfferAction(offer.id, 'REJECTED')} 
-                          className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-rose-50 hover:text-rose-600 text-gray-700 text-xs font-bold transition-all flex-1 cursor-pointer"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
-                      {offer.status === 'ACCEPTED' ? '✓ Accepted & Order Generated' : 'Declined'}
-                    </span>
-                  )}
+                <div>
+                  <h3 className="text-lg font-black text-[#022c22]">Upload & Publish Crop Details for Buyers</h3>
+                  <p className="text-xs text-[#065f46] font-semibold">Crops submitted here become instantly visible to verified buyers on the Buyer Dashboard.</p>
                 </div>
               </div>
-            ))}
+
+              {successMsg && (
+                <div className="p-4 rounded-2xl bg-[#065f46] text-white font-extrabold text-xs flex items-center gap-2 shadow-md animate-in fade-in duration-200">
+                  <CheckCircle2 className="w-5 h-5 text-[#10b981]" />
+                  <span>{successMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAddCrop} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Select Crop *</label>
+                    <select
+                      value={cropName}
+                      onChange={(e) => setCropName(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    >
+                      <option value="Tomato">Tomato</option>
+                      <option value="Wheat">Wheat</option>
+                      <option value="Onion">Onion</option>
+                      <option value="Potato">Potato</option>
+                      <option value="Rice">Rice</option>
+                      <option value="Grapes">Grapes</option>
+                      <option value="Chili">Chili</option>
+                      <option value="Soybean">Soybean</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Quality Grade *</label>
+                    <select
+                      value={quality}
+                      onChange={(e) => setQuality(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    >
+                      <option value="Grade A Fresh">Grade A Fresh (Wholesale Standard)</option>
+                      <option value="Grade A Organic">Grade A Organic (Certified)</option>
+                      <option value="Export Grade (55mm+)">Export Grade (55mm+)</option>
+                      <option value="Standard Grade B">Standard Grade B</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Quantity *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 5000"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Unit *</label>
+                    <select
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    >
+                      <option value="kg">Kilograms (kg)</option>
+                      <option value="Quintal">Quintals (100 kg)</option>
+                      <option value="Tonnes">Tonnes (1000 kg)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Asking Price per Unit (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 32"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#e1f2e6] rounded-2xl border border-[#10b981]/40 flex justify-between items-center">
+                  <span className="text-xs font-bold text-[#065f46]">Total Listing Valuation for Buyers</span>
+                  <span className="text-base font-black text-[#022c22]">
+                    ₹{(parseFloat(quantity || '0') * parseFloat(price || '0')).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Farm Pickup Location & District *</label>
+                    <input
+                      type="text"
+                      required
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">Harvest / Availability Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={harvestDate}
+                      onChange={(e) => setHarvestDate(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-[#022c22] mb-1">Produce Description & Buyer Instructions</label>
+                  <textarea
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full p-3 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white resize-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-xl hover:shadow-[#10b981]/30 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4 text-emerald-300" />
+                  <span>PUBLISH CROP DETAILS TO BUYER PORTAL</span>
+                </button>
+              </form>
+            </div>
+
+            {/* SECTION 2: PUBLISHED CROPS VISIBLE TO BUYERS */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-black text-[#022c22]">Your Active Crop Listings (Visible on Buyer Portal)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {crops.map((c) => (
+                  <div key={c.id} className="p-5 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/30 shadow-md space-y-3">
+                    <div className="flex items-start gap-4">
+                      <img src={c.imageUrl || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80'} alt={c.name} className="w-20 h-20 rounded-2xl object-cover border border-[#10b981]/30 shadow-xs" />
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                            LIVE ON BUYER PORTAL
+                          </span>
+                          <span className="text-xs font-extrabold text-[#065f46]">₹{c.pricePerUnit}/{c.unit}</span>
+                        </div>
+                        <h4 className="text-base font-black text-[#022c22]">{c.name}</h4>
+                        <p className="text-xs text-slate-600 font-semibold">
+                          Grade: <span className="font-bold text-[#022c22]">{c.quality || 'Grade A Fresh'}</span> • Qty: <span className="font-bold text-[#022c22]">{c.quantity} {c.unit}</span>
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium">{c.location}</p>
+                      </div>
+                    </div>
+                    <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex justify-between items-center text-xs">
+                      <span className="font-bold text-emerald-900">Total Lot Valuation:</span>
+                      <span className="font-black text-emerald-950">₹{(c.quantity * c.pricePerUnit).toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* SECTION 3: BUYER OFFERS RECEIVED & CHAT */}
+            <div className="space-y-4 pt-4 border-t border-emerald-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-[#022c22]">Buyer Offers Received for Your Crops</h3>
+                  <p className="text-xs text-[#065f46] font-semibold">Offers and bids submitted by wholesale buyers viewing your published crop details.</p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
+                  {offers.length} Offer(s)
+                </span>
+              </div>
+
+              {offers.map((offer) => (
+                <div key={offer.id} className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-[#10b981] bg-[#e1f2e6] px-2 py-0.5 rounded border border-[#10b981]/30">
+                        OFFER #{offer.id}
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-500">{offer.date}</span>
+                    </div>
+                    <h4 className="text-base font-black text-[#022c22]">{offer.buyerName}</h4>
+                    <p className="text-xs text-[#065f46] font-semibold">
+                      Commodity: <span className="font-bold text-[#022c22]">{offer.cropName}</span> • Offered Qty: <span className="font-bold text-[#022c22]">{offer.offeredQuantity} kg</span>
+                    </p>
+                  </div>
+
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100">
+                    <div>
+                      <span className="text-xs text-gray-500 font-bold block sm:text-right">Offered Deal Value</span>
+                      <span className="text-xl font-black text-[#065f46]">₹{offer.offeredPrice.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    {offer.status === 'PENDING' ? (
+                      <div className="flex flex-col gap-2">
+                        <button 
+                          onClick={() => {
+                            setChatRecipient({ id: offer.id, name: offer.buyerName });
+                            setChatOpen(true);
+                          }} 
+                          className="px-4 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          💬 Chat with Buyer
+                        </button>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleOfferAction(offer.id, 'ACCEPTED')} 
+                            className="px-4 py-2 rounded-xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-xs flex-1 cursor-pointer"
+                          >
+                            Accept Offer
+                          </button>
+                          <button 
+                            onClick={() => handleOfferAction(offer.id, 'REJECTED')} 
+                            className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-rose-50 hover:text-rose-600 text-gray-700 text-xs font-bold transition-all flex-1 cursor-pointer"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
+                        {offer.status === 'ACCEPTED' ? '✓ Accepted & Order Generated' : 'Declined'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
           </div>
         )}
 

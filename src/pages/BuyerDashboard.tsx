@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.tsx';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   ShoppingBag, 
   Package, 
@@ -24,13 +24,15 @@ import {
   Calendar,
   Clock
 } from 'lucide-react';
-import { LiveTrackingMap } from '../components/LiveTrackingMap.tsx';
-import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground.tsx';
-import { BuyerTrustBadge } from '../components/BuyerTrustBadge.tsx';
-import { EcosystemMapView } from '../components/EcosystemMapView.tsx';
-import { ChatWidget } from '../components/ChatWidget.tsx';
-import { BENCHMARK_BUYER_DEMANDS } from '../services/marketData.ts';
-import { BuyerDemand } from '../types.ts';
+import { LiveTrackingMap } from '../components/LiveTrackingMap';
+import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground';
+import { BuyerTrustBadge } from '../components/BuyerTrustBadge';
+import { EcosystemMapView } from '../components/EcosystemMapView';
+import { ChatWidget } from '../components/ChatWidget';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useLanguage } from '../i18n/LanguageContext';
+import { BENCHMARK_BUYER_DEMANDS } from '../services/marketData';
+import { BuyerDemand } from '../types';
 
 interface AvailableCrop {
   id: number;
@@ -96,7 +98,22 @@ const INITIAL_ORDERS: BuyerOrder[] = [
 export const BuyerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, appUser, logout } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'available-crops' | 'my-orders' | 'post-demand' | 'map' | 'delivery'>('available-crops');
+
+  // Voice navigation listener
+  useEffect(() => {
+    const handleVoiceNav = (e: any) => {
+      const target = e.detail?.tab;
+      if (target === 'offers' || target === 'available-crops') setActiveTab('available-crops');
+      else if (target === 'orders' || target === 'my-orders') setActiveTab('my-orders');
+      else if (target === 'demands' || target === 'post-demand') setActiveTab('post-demand');
+      else if (target === 'map') setActiveTab('map');
+      else if (target === 'transport' || target === 'delivery') setActiveTab('delivery');
+    };
+    window.addEventListener('farmora_voice_tab_navigate', handleVoiceNav);
+    return () => window.removeEventListener('farmora_voice_tab_navigate', handleVoiceNav);
+  }, []);
 
   // Demands state
   const [demands, setDemands] = useState<BuyerDemand[]>(BENCHMARK_BUYER_DEMANDS);
@@ -285,14 +302,18 @@ export const BuyerDashboard: React.FC = () => {
                   FARMORA BUYER PORTAL
                 </span>
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
-                  Wholesale Procurement
+                  {t('buyer.wholesaleBadge', 'Wholesale Procurement')}
                 </span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">Wholesale Procurement Hub</h1>
+              <h1 className="text-xl sm:text-2xl font-black text-[#022c22] mt-0.5">
+                {t('buyer.portalTitle', 'Wholesale Procurement Hub')}
+              </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
+            <LanguageSelector />
+
             {appUser || user ? (
               <div className="flex items-center gap-2 bg-[#e1f2e6] px-3 py-1.5 rounded-2xl border border-[#10b981]/30 shadow-xs">
                 <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs">
@@ -310,7 +331,7 @@ export const BuyerDashboard: React.FC = () => {
                   className="p-1.5 rounded-xl text-[#065f46] hover:bg-rose-100 hover:text-rose-600 transition-colors ml-1 flex items-center gap-1 font-bold text-xs"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span className="hidden md:inline">Logout</span>
+                  <span className="hidden md:inline">{t('common.logout', 'Logout')}</span>
                 </button>
               </div>
             ) : null}
@@ -330,7 +351,7 @@ export const BuyerDashboard: React.FC = () => {
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>1. Available Produce</span>
+              <span>{t('buyer.tabOffers', '1. Available Produce')}</span>
             </button>
 
             <button
@@ -342,7 +363,7 @@ export const BuyerDashboard: React.FC = () => {
               }`}
             >
               <Package className="w-4 h-4" />
-              <span>2. My Orders ({myOrders.length})</span>
+              <span>{t('buyer.tabOrders', '2. Purchase Orders')} ({myOrders.length})</span>
             </button>
 
             <button
@@ -354,7 +375,7 @@ export const BuyerDashboard: React.FC = () => {
               }`}
             >
               <Target className="w-4 h-4 text-[#10b981]" />
-              <span>3. Buyer Demands</span>
+              <span>{t('buyer.tabPostDemand', '3. Broadcast Demand')}</span>
             </button>
 
             <button
@@ -366,7 +387,7 @@ export const BuyerDashboard: React.FC = () => {
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>4. Ecosystem Map</span>
+              <span>{t('buyer.tabMaps', '4. Ecosystem Map')}</span>
             </button>
 
             <button
@@ -378,7 +399,7 @@ export const BuyerDashboard: React.FC = () => {
               }`}
             >
               <Truck className="w-4 h-4" />
-              <span>5. Transportation</span>
+              <span>{t('buyer.tabTransport', '5. Freight Tracking')}</span>
             </button>
 
           </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { FPO, FPOBulkOffer, FPOMember, Crop } from '../types.ts';
-import { BENCHMARK_FPOS } from '../services/marketData.ts';
+import { FPO, FPOBulkOffer, FPOMember, Crop } from '../types';
+import { BENCHMARK_FPOS } from '../services/marketData';
 import { Users, Plus, CheckCircle2, ShoppingBag, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface Props {

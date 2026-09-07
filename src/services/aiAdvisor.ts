@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { Crop, MandiPrice, Warehouse, BuyerDemand, AiRecommendation } from '../types.ts';
+import { Crop, MandiPrice, Warehouse, BuyerDemand, AiRecommendation } from '../types';
 
 /**
  * Generates an explicit SELL NOW, STORE, or AGGREGATE recommendation with financial projections

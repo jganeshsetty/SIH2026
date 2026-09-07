@@ -11,6 +11,7 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   phone: text('phone'),
   address: text('address'),
+  preferredLanguage: text('preferred_language').default('en'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -68,7 +69,22 @@ export const transportRequests = pgTable('transport_requests', {
   transporterId: integer('transporter_id').references(() => users.id),
   pickupLocation: text('pickup_location').notNull(),
   dropLocation: text('drop_location').notNull(),
-  status: text('status').default('REQUESTED'), // REQUESTED, ASSIGNED, PICKED_UP, IN_TRANSIT, DELIVERED
+  pathType: text('path_type').default('FARMER_TO_BUYER'), // FARMER_TO_BUYER, FARMER_TO_FPO, FARMER_TO_STOREHOUSE
+  cropPhotoUrl: text('crop_photo_url'),
+  qualityVerified: boolean('quality_verified').default(false),
+  verificationDetails: text('verification_details'),
+  verificationTimestamp: timestamp('verification_timestamp'),
+  status: text('status').default('REQUESTED'), // REQUESTED, ACCEPTED, DRIVER_ASSIGNED, PICKUP_STARTED, PICKED_UP, IN_TRANSIT, ARRIVED, QUALITY_VERIFIED, DELIVERED, COMPLETED
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const notifications = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  type: text('type').default('INFO'),
+  isRead: boolean('is_read').default(false),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

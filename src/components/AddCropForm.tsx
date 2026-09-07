@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext.tsx';
-import { Button } from './ui/button.tsx';
-import { Input } from './ui/input.tsx';
-import { Label } from './ui/label.tsx';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 
 export function AddCropForm({ onComplete }: { onComplete: () => void }) {
   const { token } = useAuth();

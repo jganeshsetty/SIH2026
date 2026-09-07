@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth, UserRole } from '../contexts/AuthContext.tsx';
+import { useAuth, UserRole } from '../contexts/AuthContext';
 import { Sprout } from 'lucide-react';
 
 interface ProtectedRouteProps {

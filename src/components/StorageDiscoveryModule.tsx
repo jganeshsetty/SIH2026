@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Warehouse, StorageBooking } from '../types.ts';
-import { BENCHMARK_WAREHOUSES } from '../services/marketData.ts';
+import { Warehouse, StorageBooking } from '../types';
+import { BENCHMARK_WAREHOUSES } from '../services/marketData';
 import { Archive, MapPin, CheckCircle2, Phone, ShieldCheck, ArrowRight } from 'lucide-react';
 
 interface Props {

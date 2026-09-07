@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth, UserRole } from '../contexts/AuthContext.tsx';
+import { useAuth, UserRole } from '../contexts/AuthContext';
 import { Sprout, ShoppingBag, Truck, ArrowRight, ShieldCheck, Mail, Lock, User, Phone, MapPin, AlertCircle, LogIn, UserPlus } from 'lucide-react';
-import { Button } from '../components/ui/button.tsx';
-import { Input } from '../components/ui/input.tsx';
-import { Label } from '../components/ui/label.tsx';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { useLanguage } from '../i18n/LanguageContext';
+import { LanguageSelector } from '../components/LanguageSelector';
 
 export function AuthPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { appUser, token, registerWithEmail, loginWithEmail, signInWithGoogle } = useAuth();
+  const { t } = useLanguage();
 
   const initialRoleParam = searchParams.get('role') as UserRole || 'farmer';
   const initialModeParam = searchParams.get('mode') === 'login' ? 'login' : 'register';
@@ -128,18 +131,21 @@ export function AuthPage() {
       
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center mb-6">
-        <div 
-          onClick={() => navigate('/')}
-          className="inline-flex items-center justify-center space-x-3 bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-full text-white cursor-pointer hover:bg-white/20 transition-all border border-white/20 shadow-lg mb-4"
-        >
-          <Sprout className="w-7 h-7 text-emerald-400" />
-          <span className="font-extrabold text-2xl tracking-tight">Farmora</span>
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div 
+            onClick={() => navigate('/')}
+            className="inline-flex items-center justify-center space-x-3 bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-full text-white cursor-pointer hover:bg-white/20 transition-all border border-white/20 shadow-lg"
+          >
+            <Sprout className="w-7 h-7 text-emerald-400" />
+            <span className="font-extrabold text-2xl tracking-tight">{t('common.appName', 'Farmora')}</span>
+          </div>
+          <LanguageSelector />
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">
-          Welcome to Farmora Agriculture
+          {activeTab === 'register' ? t('auth.createAccount', 'Welcome to Farmora Agriculture') : t('auth.signIn', 'Welcome Back to Farmora')}
         </h1>
         <p className="mt-2 text-sm text-emerald-200">
-          Smart Agriculture & Direct Produce Market Platform
+          {t('common.tagline', 'Smart Agriculture & Direct Produce Market Platform')}
         </p>
       </div>
 
@@ -152,10 +158,10 @@ export function AuthPage() {
           <div className="bg-white/95 backdrop-blur-xl p-6 rounded-3xl shadow-xl border border-emerald-100">
             <div className="text-center mb-5">
               <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-widest block mb-1">
-                Select Your Role to Get Started
+                {t('auth.chooseRole', 'Select Your Role to Get Started')}
               </span>
               <h2 className="text-xl font-bold text-slate-900">
-                Register / Sign Up by Account Type
+                {t('auth.chooseRole', 'Register / Sign Up by Account Type')}
               </h2>
             </div>
 
@@ -175,14 +181,14 @@ export function AuthPage() {
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md mb-2">
                   <Sprout className="w-6 h-6" />
                 </div>
-                <span className="font-extrabold text-base block text-slate-900">Farmer</span>
-                <span className="text-xs text-slate-500 mt-1">Sell produce & track Mandi rates</span>
+                <span className="font-extrabold text-base block text-slate-900">{t('auth.farmerRole', 'Farmer')}</span>
+                <span className="text-xs text-slate-500 mt-1">{t('auth.farmerDesc', 'Sell produce & track Mandi rates')}</span>
                 <span className={`mt-3 px-3 py-1 rounded-xl text-xs font-bold w-full transition-colors ${
                   selectedRole === 'farmer' && activeTab === 'register'
                     ? 'bg-emerald-700 text-white'
                     : 'bg-emerald-100 text-emerald-800'
                 }`}>
-                  Sign Up as Farmer
+                  {t('auth.createAccount', 'Sign Up as Farmer')}
                 </span>
               </button>
 
@@ -199,14 +205,14 @@ export function AuthPage() {
                 <div className="w-12 h-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md mb-2">
                   <ShoppingBag className="w-6 h-6" />
                 </div>
-                <span className="font-extrabold text-base block text-slate-900">Buyer</span>
-                <span className="text-xs text-slate-500 mt-1">Procure bulk fresh crops</span>
+                <span className="font-extrabold text-base block text-slate-900">{t('auth.buyerRole', 'Buyer')}</span>
+                <span className="text-xs text-slate-500 mt-1">{t('auth.buyerDesc', 'Procure bulk fresh crops')}</span>
                 <span className={`mt-3 px-3 py-1 rounded-xl text-xs font-bold w-full transition-colors ${
                   selectedRole === 'buyer' && activeTab === 'register'
                     ? 'bg-amber-700 text-white'
                     : 'bg-amber-100 text-amber-900'
                 }`}>
-                  Sign Up as Buyer
+                  {t('auth.createAccount', 'Sign Up as Buyer')}
                 </span>
               </button>
 
@@ -223,14 +229,14 @@ export function AuthPage() {
                 <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md mb-2">
                   <Truck className="w-6 h-6" />
                 </div>
-                <span className="font-extrabold text-base block text-slate-900">Transport Driver</span>
-                <span className="text-xs text-slate-500 mt-1">Accept freight orders & GPS dispatch</span>
+                <span className="font-extrabold text-base block text-slate-900">{t('auth.transporterRole', 'Transport Driver')}</span>
+                <span className="text-xs text-slate-500 mt-1">{t('auth.transporterDesc', 'Accept freight orders & GPS dispatch')}</span>
                 <span className={`mt-3 px-3 py-1 rounded-xl text-xs font-bold w-full transition-colors ${
                   selectedRole === 'transporter' && activeTab === 'register'
                     ? 'bg-blue-700 text-white'
                     : 'bg-blue-100 text-blue-900'
                 }`}>
-                  Sign Up as Driver
+                  {t('auth.createAccount', 'Sign Up as Driver')}
                 </span>
               </button>
 
@@ -255,7 +261,7 @@ export function AuthPage() {
               }`}
             >
               <UserPlus className="w-4 h-4 text-emerald-600" />
-              <span>Create Account ({selectedRole.toUpperCase()})</span>
+              <span>{t('auth.createAccount', 'Create Account')} ({selectedRole.toUpperCase()})</span>
             </button>
 
             <button
@@ -268,7 +274,7 @@ export function AuthPage() {
               }`}
             >
               <LogIn className="w-4 h-4 text-emerald-600" />
-              <span>Log In</span>
+              <span>{t('auth.signIn', 'Log In')}</span>
             </button>
           </div>
 
@@ -285,12 +291,12 @@ export function AuthPage() {
           {activeTab === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-900 flex items-center justify-between">
-                <span>Registering as: <strong className="uppercase text-emerald-700">{selectedRole}</strong></span>
+                <span>{t('auth.chooseRole', 'Registering as')}: <strong className="uppercase text-emerald-700">{selectedRole}</strong></span>
                 <span className="text-[11px] text-emerald-600 font-medium">Stored in PostgreSQL</span>
               </div>
 
               <div>
-                <Label htmlFor="name" className="text-xs font-bold text-slate-700">Full Name *</Label>
+                <Label htmlFor="name" className="text-xs font-bold text-slate-700">{t('auth.fullName', 'Full Name')} *</Label>
                 <div className="mt-1 relative">
                   <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
@@ -306,7 +312,7 @@ export function AuthPage() {
               </div>
 
               <div>
-                <Label htmlFor="email" className="text-xs font-bold text-slate-700">Email Address *</Label>
+                <Label htmlFor="email" className="text-xs font-bold text-slate-700">{t('auth.emailAddress', 'Email Address')} *</Label>
                 <div className="mt-1 relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
@@ -322,7 +328,7 @@ export function AuthPage() {
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-xs font-bold text-slate-700">Password *</Label>
+                <Label htmlFor="password" className="text-xs font-bold text-slate-700">{t('auth.password', 'Password')} *</Label>
                 <div className="mt-1 relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
@@ -339,7 +345,7 @@ export function AuthPage() {
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
-                  <Label htmlFor="phone" className="text-xs font-bold text-slate-700">Phone (Optional)</Label>
+                  <Label htmlFor="phone" className="text-xs font-bold text-slate-700">{t('auth.phone', 'Phone (Optional)')}</Label>
                   <div className="mt-1 relative">
                     <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <Input
@@ -353,7 +359,7 @@ export function AuthPage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="address" className="text-xs font-bold text-slate-700">Location (Optional)</Label>
+                  <Label htmlFor="address" className="text-xs font-bold text-slate-700">{t('auth.address', 'Location (Optional)')}</Label>
                   <div className="mt-1 relative">
                     <MapPin className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <Input
@@ -377,7 +383,7 @@ export function AuthPage() {
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Register Account as {selectedRole.toUpperCase()}</span>
+                    <span>{t('auth.createAccount', 'Register Account as')} {selectedRole.toUpperCase()}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -395,7 +401,7 @@ export function AuthPage() {
               </div>
 
               <div>
-                <Label htmlFor="loginEmail" className="text-xs font-bold text-slate-700">Registered Email Address *</Label>
+                <Label htmlFor="loginEmail" className="text-xs font-bold text-slate-700">{t('auth.emailAddress', 'Registered Email Address')} *</Label>
                 <div className="mt-1 relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
@@ -411,7 +417,7 @@ export function AuthPage() {
               </div>
 
               <div>
-                <Label htmlFor="loginPassword" className="text-xs font-bold text-slate-700">Password *</Label>
+                <Label htmlFor="loginPassword" className="text-xs font-bold text-slate-700">{t('auth.password', 'Password')} *</Label>
                 <div className="mt-1 relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
@@ -437,7 +443,7 @@ export function AuthPage() {
                 ) : (
                   <>
                     <LogIn className="w-5 h-5" />
-                    <span>Log In to My Dashboard</span>
+                    <span>{t('auth.signIn', 'Log In to My Dashboard')}</span>
                   </>
                 )}
               </Button>
@@ -450,7 +456,7 @@ export function AuthPage() {
               <div className="w-full border-t border-slate-200" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-3 text-slate-400 font-bold">Or sign in with</span>
+              <span className="bg-white px-3 text-slate-400 font-bold">{t('auth.orContinueWithEmail', 'Or sign in with')}</span>
             </div>
           </div>
 
@@ -466,7 +472,7 @@ export function AuthPage() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
             </svg>
-            <span>Google Account ({selectedRole.toUpperCase()})</span>
+            <span>{t('auth.continueWithGoogle', 'Google Account')} ({selectedRole.toUpperCase()})</span>
           </button>
 
           <div className="mt-6 text-center text-[11px] text-slate-400 flex items-center justify-center space-x-1 font-semibold">
