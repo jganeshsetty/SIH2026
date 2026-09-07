@@ -1,3 +1,7 @@
+// ============================================================================
+// Farmora Firebase Client Authentication Setup
+// ============================================================================
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import jsonConfig from '../../firebase-applet-config.json';
@@ -11,7 +15,8 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || jsonConfig.appId,
 };
 
+// Singleton Firebase Application Instance
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
 export const auth = getAuth(app);
 export const googleAuthProvider = new GoogleAuthProvider();
-

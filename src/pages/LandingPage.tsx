@@ -136,13 +136,12 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Unified Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-bold text-emerald-900">
+          <nav className="hidden lg:flex items-center gap-5 text-xs font-bold text-emerald-950">
             <button onClick={() => scrollToSection('about')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.about', 'About')}</button>
-            <button onClick={() => scrollToSection('how-it-works')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.howItWorks', 'How It Works')}</button>
+            <button onClick={() => scrollToSection('how-it-works')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.howItWorks', 'Ecosystem')}</button>
             <button onClick={() => scrollToSection('features')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.features', 'Core Features')}</button>
-            <button onClick={() => scrollToSection('ai-advisor')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.aiAdvisor', 'AI Strategy')}</button>
+            <button onClick={() => scrollToSection('ai-advisor')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.aiAdvisor', 'Workflow')}</button>
             <button onClick={() => scrollToSection('impact')} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.impact', 'Impact')}</button>
-            <button onClick={() => setAuthModal({ isOpen: true, mode: 'register' })} className="hover:text-emerald-700 transition-colors cursor-pointer">{t('nav.transporterHub', 'Transporter Hub')}</button>
           </nav>
 
           {/* User Auth Action Area & Global Language Selector */}
@@ -176,9 +175,9 @@ export const LandingPage: React.FC = () => {
               <div className="hidden sm:flex items-center gap-2">
                 <button 
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer border border-emerald-300"
+                  className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-emerald-800 hover:bg-emerald-700 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  <UserPlus className="w-3.5 h-3.5 text-emerald-700" />
+                  <Sprout className="w-3.5 h-3.5 text-emerald-300" />
                   <span>{t('common.register', 'Register')}</span>
                 </button>
               </div>
@@ -186,9 +185,9 @@ export const LandingPage: React.FC = () => {
 
             <button 
               onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
-              className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-emerald-800 hover:bg-emerald-700 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogIn className="w-3.5 h-3.5 text-emerald-700" />
               <span>{t('common.login', 'Log In')}</span>
             </button>
           </div>
@@ -214,7 +213,7 @@ export const LandingPage: React.FC = () => {
             </span>
           </h1>
 
-          <p className="text-base sm:text-xl text-emerald-900/90 max-w-3xl mx-auto mb-4 leading-relaxed font-semibold">
+          <p className="text-base sm:text-xl text-slate-700 max-w-3xl mx-auto mb-4 leading-relaxed font-semibold">
             {t('landing.heroSubtitle', 'Farmora connects farmers, wholesale buyers, cold storage facilities, FPOs, and freight logistics through one connected agricultural platform.')}
           </p>
 
@@ -225,7 +224,7 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-xl mx-auto mb-16">
             <button
               onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-800 to-emerald-900 text-white font-extrabold text-base shadow-xl shadow-emerald-900/20 hover:from-emerald-700 hover:to-emerald-800 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer border border-emerald-600/30"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-emerald-800 hover:bg-emerald-700 text-white font-extrabold text-base shadow-xl shadow-emerald-900/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer border border-emerald-600/30"
             >
               <Sprout className="w-5 h-5 text-emerald-300" />
               <span>{t('common.register', 'Register Account')}</span>
@@ -234,7 +233,7 @@ export const LandingPage: React.FC = () => {
 
             <button
               onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white/90 text-emerald-950 font-bold text-base border border-emerald-600/30 hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white text-emerald-950 font-bold text-base border border-emerald-300 hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
               <LogIn className="w-5 h-5 text-emerald-700" />
               <span>{t('common.login', 'Log In to Dashboard')}</span>
@@ -245,19 +244,19 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
             <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-emerald-600/20 shadow-xs">
               <span className="block text-2xl font-black text-emerald-950">₹32/kg</span>
-              <span className="text-xs font-semibold text-emerald-700">{t('landing.statRates', 'Real-Time Mandi Rates')}</span>
+              <span className="text-xs font-semibold text-emerald-800">{t('landing.statRates', 'Real-Time Mandi Rates')}</span>
             </div>
             <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-emerald-600/20 shadow-xs">
               <span className="block text-2xl font-black text-emerald-950">3 Paths</span>
-              <span className="text-xs font-semibold text-emerald-700">{t('landing.statPaths', 'Sell, Store or FPO')}</span>
+              <span className="text-xs font-semibold text-emerald-800">{t('landing.statPaths', 'Sell, Store or FPO')}</span>
             </div>
             <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-emerald-600/20 shadow-xs">
               <span className="block text-2xl font-black text-emerald-950">100%</span>
-              <span className="text-xs font-semibold text-emerald-700">{t('landing.statEscrow', '₹48 Cr+ Escrow Settled')}</span>
+              <span className="text-xs font-semibold text-emerald-800">{t('landing.statEscrow', '₹48 Cr+ Escrow Settled')}</span>
             </div>
             <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-emerald-600/20 shadow-xs">
               <span className="block text-2xl font-black text-emerald-950">98.4%</span>
-              <span className="text-xs font-semibold text-emerald-700">{t('landing.statDelivery', 'On-Time Freight Delivery')}</span>
+              <span className="text-xs font-semibold text-emerald-800">{t('landing.statDelivery', 'On-Time Freight Delivery')}</span>
             </div>
           </div>
         </section>
@@ -265,11 +264,13 @@ export const LandingPage: React.FC = () => {
         {/* 2. THE AGRICULTURAL PROBLEM */}
         <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-emerald-700 mb-2">{t('landing.challengeBadge', 'The Agricultural Challenge')}</h2>
+            <div className="inline-block px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-950 text-xs font-extrabold tracking-wider mb-3">
+              {t('landing.challengeBadge', 'The Agricultural Challenge')}
+            </div>
             <h3 className="text-3xl sm:text-5xl font-black text-emerald-950 tracking-tight">
               {t('landing.challengeTitle', 'Good Produce Deserves Better Decisions.')}
             </h3>
-            <p className="mt-4 text-emerald-900/80 font-medium">
+            <p className="mt-4 text-slate-700 font-medium">
               {t('landing.challengeSubtitle', 'Every harvesting season, Indian farmers face price manipulation, forced distress sales, lack of cold storage transparency, and uncoordinated transportation.')}
             </p>
           </div>
@@ -278,7 +279,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white/85 backdrop-blur-xl p-6 rounded-3xl border border-rose-200 shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-700 mb-4 font-bold">01</div>
               <h4 className="text-lg font-bold text-slate-900 mb-2">{t('landing.prob1Title', 'Distress Sales & Exploitation')}</h4>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 {t('landing.prob1Desc', 'Without real-time market price evaluation, farmers sell perishable produce below cost to local intermediaries.')}
               </p>
             </div>
@@ -286,7 +287,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white/85 backdrop-blur-xl p-6 rounded-3xl border border-amber-200 shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-700 mb-4 font-bold">02</div>
               <h4 className="text-lg font-bold text-slate-900 mb-2">{t('landing.prob2Title', 'Inaccessible Storage Options')}</h4>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 {t('landing.prob2Desc', 'Farmers lack visibility into nearby cold storages and warehouses that could preserve crops during price dips.')}
               </p>
             </div>
@@ -294,7 +295,7 @@ export const LandingPage: React.FC = () => {
             <div className="bg-white/85 backdrop-blur-xl p-6 rounded-3xl border border-emerald-200 shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 mb-4 font-bold">03</div>
               <h4 className="text-lg font-bold text-slate-900 mb-2">{t('landing.prob3Title', 'Uncoordinated Logistics')}</h4>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 {t('landing.prob3Desc', 'Buyers and drivers operate in silos, causing delivery delays, quality decay, and unverified crop handovers.')}
               </p>
             </div>
@@ -305,7 +306,7 @@ export const LandingPage: React.FC = () => {
         <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-950 p-8 sm:p-12 rounded-3xl shadow-2xl text-white border border-emerald-500/20">
             <div className="text-center max-w-3xl mx-auto mb-10">
-              <span className="px-3 py-1 rounded-full bg-emerald-800/80 text-emerald-300 text-xs font-extrabold uppercase tracking-wider">
+              <span className="px-3.5 py-1.5 rounded-full bg-emerald-800/90 text-emerald-300 text-xs font-bold tracking-wide">
                 {t('landing.solutionBadge', 'The Ecosystem Solution')}
               </span>
               <h3 className="text-3xl sm:text-5xl font-black tracking-tight mt-3">
@@ -349,7 +350,9 @@ export const LandingPage: React.FC = () => {
         {/* 4. THE 7-STEP STORY WORKFLOW */}
         <section id="ai-advisor" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
           <div className="text-center max-w-3xl mx-auto">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-emerald-700 mb-2">{t('landing.workflowBadge', 'End-to-End Workflow')}</h2>
+            <div className="inline-block px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-950 text-xs font-extrabold tracking-wider mb-3">
+              {t('landing.workflowBadge', 'End-to-End Workflow')}
+            </div>
             <h3 className="text-3xl sm:text-5xl font-black text-emerald-950 tracking-tight">
               {t('landing.workflowTitle', 'The Farmora Mechanism: From Field to Destination')}
             </h3>
@@ -370,7 +373,7 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="p-6 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-2 shadow-inner">
-              <div className="text-emerald-400 font-bold">// Farmer Crop Submission</div>
+              <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-400 mb-2">Farmer Crop Submission</div>
               <div>Crop: "Tomato (Grade A Fresh)"</div>
               <div>Quantity: 5000 kg @ ₹32/kg</div>
               <div>Location: Nashik, Maharashtra</div>
@@ -381,7 +384,7 @@ export const LandingPage: React.FC = () => {
           {/* Step 2 */}
           <div className="grid md:grid-cols-2 gap-8 items-center bg-white/90 backdrop-blur-xl p-8 rounded-3xl border border-emerald-600/20 shadow-md">
             <div className="order-2 md:order-1 p-6 rounded-2xl bg-gradient-to-br from-emerald-900 to-slate-900 text-white space-y-3">
-              <div className="text-xs font-extrabold text-emerald-400">AI DECISION MATRIX EVALUATION</div>
+              <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-400 mb-2">AI Decision Matrix Evaluation</div>
               <div className="flex justify-between text-xs"><span>Current Mandi Price:</span><span className="text-emerald-300 font-bold">₹32/kg (Upward Trend)</span></div>
               <div className="flex justify-between text-xs"><span>Storage Cost:</span><span>₹450/Ton/Month</span></div>
               <div className="flex justify-between text-xs"><span>Buyer Demand Volume:</span><span className="text-amber-300 font-bold">12,500 kg Open</span></div>
@@ -409,62 +412,100 @@ export const LandingPage: React.FC = () => {
               <h4 className="text-2xl font-extrabold text-emerald-950">{t('landing.wfStep3Title', 'Choose the Path That Fits.')}</h4>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200">
-                <ShoppingBag className="w-8 h-8 text-emerald-700 mb-3" />
-                <h5 className="font-extrabold text-emerald-950 text-base mb-1">{t('landing.wfPath1Title', '1. Direct Wholesale Buyer')}</h5>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {t('landing.wfPath1Desc', 'Sell directly to verified commercial buyers at agreed market rates with instant escrow payment.')}
-                </p>
+              <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col justify-between">
+                <div>
+                  <ShoppingBag className="w-8 h-8 text-emerald-700 mb-3" />
+                  <h5 className="font-extrabold text-emerald-950 text-base mb-1">{t('landing.wfPath1Title', '1. Direct Wholesale Buyer')}</h5>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {t('landing.wfPath1Desc', 'Sell directly to verified commercial buyers at agreed market rates with instant escrow payment.')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-800 hover:text-emerald-950 transition-colors cursor-pointer"
+                >
+                  <span>Select Direct Trade</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-              <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200">
-                <Archive className="w-8 h-8 text-amber-700 mb-3" />
-                <h5 className="font-extrabold text-slate-950 text-base mb-1">{t('landing.wfPath2Title', '2. Cold Storage Preservation')}</h5>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {t('landing.wfPath2Desc', 'Reserve nearby warehouse capacity based on exact crop volume to wait out temporary price drops.')}
-                </p>
+              <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col justify-between">
+                <div>
+                  <Archive className="w-8 h-8 text-amber-700 mb-3" />
+                  <h5 className="font-extrabold text-slate-950 text-base mb-1">{t('landing.wfPath2Title', '2. Cold Storage Preservation')}</h5>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {t('landing.wfPath2Desc', 'Reserve nearby warehouse capacity based on exact crop volume to wait out temporary price drops.')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-800 hover:text-amber-950 transition-colors cursor-pointer"
+                >
+                  <span>Reserve Storage</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-              <div className="p-6 rounded-2xl bg-cyan-50 border border-cyan-200">
-                <Users className="w-8 h-8 text-cyan-700 mb-3" />
-                <h5 className="font-extrabold text-slate-950 text-base mb-1">{t('landing.wfPath3Title', '3. FPO Aggregate Pooling')}</h5>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {t('landing.wfPath3Desc', 'Pool produce with Farmers Producer Organizations to command premium bulk export prices.')}
-                </p>
+              <div className="p-6 rounded-2xl bg-cyan-50 border border-cyan-200 flex flex-col justify-between">
+                <div>
+                  <Users className="w-8 h-8 text-cyan-700 mb-3" />
+                  <h5 className="font-extrabold text-slate-950 text-base mb-1">{t('landing.wfPath3Title', '3. FPO Aggregate Pooling')}</h5>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {t('landing.wfPath3Desc', 'Pool produce with Farmers Producer Organizations to command premium bulk export prices.')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-cyan-800 hover:text-cyan-950 transition-colors cursor-pointer"
+                >
+                  <span>Join FPO Bulk Pool</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
 
           {/* Steps 4, 5, 6, 7 Grid */}
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep4Tag', 'STEP 4 — TRANSACTIONS')}</div>
-              <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep4Title', 'Turn Opportunities Into Trusted Transactions.')}</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {t('landing.wfStep4Desc', 'Farmers receive direct offers from buyers, negotiate via encrypted in-app chat, accept terms, and record secure payments in PostgreSQL.')}
-              </p>
+            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm h-full flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep4Tag', 'STEP 4 — TRANSACTIONS')}</div>
+                <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep4Title', 'Turn Opportunities Into Trusted Transactions.')}</h5>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {t('landing.wfStep4Desc', 'Farmers receive direct offers from buyers, negotiate via encrypted in-app chat, accept terms, and record secure payments in PostgreSQL.')}
+                </p>
+              </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep5Tag', 'STEP 5 — LOGISTICS')}</div>
-              <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep5Title', 'Move Produce Without the Guesswork.')}</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {t('landing.wfStep5Desc', 'Freight requests are broadcasted to transport drivers for all 3 paths: Farmer → Buyer, Farmer → FPO, or Farmer → Storehouse.')}
-              </p>
+            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm h-full flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep5Tag', 'STEP 5 — LOGISTICS')}</div>
+                <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep5Title', 'Move Produce Without the Guesswork.')}</h5>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {t('landing.wfStep5Desc', 'Freight requests are broadcasted to transport drivers for all 3 paths: Farmer → Buyer, Farmer → FPO, or Farmer → Storehouse.')}
+                </p>
+              </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep6Tag', 'STEP 6 — LIVE TRACKING')}</div>
-              <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep6Title', 'Track Every Mile in Real-Time.')}</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {t('landing.wfStep6Desc', 'Dynamic GPS telemetry streams vehicle location, speed, ETA, and progress percentages live across Farmer, Buyer, and Transporter portals.')}
-              </p>
+            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm h-full flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep6Tag', 'STEP 6 — LIVE TRACKING')}</div>
+                <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep6Title', 'Track Every Mile in Real-Time.')}</h5>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {t('landing.wfStep6Desc', 'Dynamic GPS telemetry streams vehicle location, speed, ETA, and progress percentages live across Farmer, Buyer, and Transporter portals.')}
+                </p>
+              </div>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep7Tag', 'STEP 7 — QUALITY AUDIT')}</div>
-              <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep7Title', 'Verify. Deliver. Complete.')}</h5>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {t('landing.wfStep7Desc', 'Drivers capture live crop photos and verify quality checklists (freshness, grade, packaging) at pickup before final delivery confirmation.')}
-              </p>
+            <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-emerald-600/20 shadow-sm h-full flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-extrabold text-emerald-700 mb-1">{t('landing.wfStep7Tag', 'STEP 7 — QUALITY AUDIT')}</div>
+                <h5 className="text-lg font-bold text-slate-900 mb-2">{t('landing.wfStep7Title', 'Verify. Deliver. Complete.')}</h5>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {t('landing.wfStep7Desc', 'Drivers capture live crop photos and verify quality checklists (freshness, grade, packaging) at pickup before final delivery confirmation.')}
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -480,12 +521,12 @@ export const LandingPage: React.FC = () => {
               {t('landing.multiDesc', 'Our intelligent voice & text assistant supports 10 Indian languages, giving farmers instant guidance on Mandi prices, storage reservations, and crop listing.')}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
-              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold">English</span>
-              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold">मराठी (Marathi)</span>
-              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold">हिन्दी (Hindi)</span>
-              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold">ಕನ್ನಡ (Kannada)</span>
-              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold">తెలుగు (Telugu)</span>
-              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold">தமிழ் (Tamil)</span>
+              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-bold">English</span>
+              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-bold">मराठी (Marathi)</span>
+              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-bold">हिन्दी (Hindi)</span>
+              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-bold">ಕನ್ನಡ (Kannada)</span>
+              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-bold">తెలుగు (Telugu)</span>
+              <span className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-bold">தமிழ் (Tamil)</span>
             </div>
           </div>
         </section>
@@ -493,39 +534,47 @@ export const LandingPage: React.FC = () => {
         {/* 6. IMPACT & BENEFITS */}
         <section id="impact" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-emerald-700 mb-2">{t('landing.impactBadge', 'Platform Impact')}</h2>
+            <div className="inline-block px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-950 text-xs font-extrabold tracking-wider mb-3">
+              {t('landing.impactBadge', 'Platform Impact')}
+            </div>
             <h3 className="text-3xl sm:text-5xl font-black text-emerald-950 tracking-tight">
               {t('landing.impactTitle', 'Empowering the Agricultural Value Chain')}
             </h3>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 text-center">
-            <div className="bg-white/85 backdrop-blur-xl p-8 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <TrendingUp className="w-10 h-10 text-emerald-700 mx-auto mb-3" />
-              <h4 className="text-3xl font-black text-emerald-950 mb-1">{t('landing.impact1Stat', '+28%')}</h4>
-              <span className="text-xs font-bold text-emerald-800 block mb-2">{t('landing.impact1Label', 'Average Farmer Income')}</span>
-              <p className="text-xs text-slate-600">{t('landing.impact1Desc', 'Eliminating unfair middleman price markups through direct buyer access and FPO aggregation.')}</p>
+            <div className="bg-white/85 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-emerald-600/20 shadow-sm flex flex-col items-center justify-between space-y-3">
+              <div>
+                <TrendingUp className="w-10 h-10 text-emerald-700 mx-auto mb-3" />
+                <h4 className="text-3xl font-black text-emerald-950 mb-1">{t('landing.impact1Stat', '+28%')}</h4>
+                <span className="text-xs font-bold text-emerald-800 block mb-2">{t('landing.impact1Label', 'Average Farmer Income')}</span>
+                <p className="text-xs text-slate-600">{t('landing.impact1Desc', 'Eliminating unfair middleman price markups through direct buyer access and FPO aggregation.')}</p>
+              </div>
             </div>
 
-            <div className="bg-white/85 backdrop-blur-xl p-8 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <Archive className="w-10 h-10 text-amber-700 mx-auto mb-3" />
-              <h4 className="text-3xl font-black text-slate-950 mb-1">{t('landing.impact2Stat', '-40%')}</h4>
-              <span className="text-xs font-bold text-amber-800 block mb-2">{t('landing.impact2Label', 'Post-Harvest Crop Wastage')}</span>
-              <p className="text-xs text-slate-600">{t('landing.impact2Desc', 'Immediate access to cold storage capacity preserving crop quality during market surplus.')}</p>
+            <div className="bg-white/85 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-emerald-600/20 shadow-sm flex flex-col items-center justify-between space-y-3">
+              <div>
+                <Archive className="w-10 h-10 text-amber-700 mx-auto mb-3" />
+                <h4 className="text-3xl font-black text-slate-950 mb-1">{t('landing.impact2Stat', '-40%')}</h4>
+                <span className="text-xs font-bold text-amber-800 block mb-2">{t('landing.impact2Label', 'Post-Harvest Crop Wastage')}</span>
+                <p className="text-xs text-slate-600">{t('landing.impact2Desc', 'Immediate access to cold storage capacity preserving crop quality during market surplus.')}</p>
+              </div>
             </div>
 
-            <div className="bg-white/85 backdrop-blur-xl p-8 rounded-3xl border border-emerald-600/20 shadow-sm">
-              <Truck className="w-10 h-10 text-cyan-700 mx-auto mb-3" />
-              <h4 className="text-3xl font-black text-slate-950 mb-1">{t('landing.impact3Stat', '100%')}</h4>
-              <span className="text-xs font-bold text-cyan-800 block mb-2">{t('landing.impact3Label', 'Quality Verified Delivery')}</span>
-              <p className="text-xs text-slate-600">{t('landing.impact3Desc', 'Driver photo audits and live 3-portal telemetry guaranteeing end-to-end freight transparency.')}</p>
+            <div className="bg-white/85 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-emerald-600/20 shadow-sm flex flex-col items-center justify-between space-y-3">
+              <div>
+                <Truck className="w-10 h-10 text-cyan-700 mx-auto mb-3" />
+                <h4 className="text-3xl font-black text-slate-950 mb-1">{t('landing.impact3Stat', '100%')}</h4>
+                <span className="text-xs font-bold text-cyan-800 block mb-2">{t('landing.impact3Label', 'Quality Verified Delivery')}</span>
+                <p className="text-xs text-slate-600">{t('landing.impact3Desc', 'Driver photo audits and live 3-portal telemetry guaranteeing end-to-end freight transparency.')}</p>
+              </div>
             </div>
           </div>
         </section>
 
         {/* 7. FINAL CALL TO ACTION */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <div className="bg-gradient-to-br from-emerald-900 via-emerald-850 to-emerald-950 p-10 sm:p-16 rounded-3xl shadow-2xl text-white border border-emerald-400/30">
+          <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-950 py-12 sm:py-16 px-6 sm:px-12 rounded-3xl shadow-2xl text-white border border-emerald-400/30 flex flex-col items-center justify-center text-center">
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight mb-4">
               {t('landing.ctaTitle', 'Your Harvest Has a Destination.')}<br />
               <span className="text-emerald-300">{t('landing.ctaHighlight', 'Farmora Helps You Find It.')}</span>

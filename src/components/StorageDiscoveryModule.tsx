@@ -54,11 +54,44 @@ export const StorageDiscoveryModule: React.FC<Props> = ({ userFarmerId = 1, onBo
       createdAt: new Date().toISOString().split('T')[0]
     };
 
+    const newDeliveryRequest = {
+      id: Date.now(),
+      cropName: cropName,
+      quantity: qty * 1000,
+      unit: "kg",
+      farmerName: "Ganesh (Farmer)",
+      farmerLocation: "Central Agro Zone, Nashik, Maharashtra",
+      buyerName: selectedWarehouse.name,
+      buyerLocation: selectedWarehouse.location,
+      pathType: "Farmer → Storehouse" as const,
+      distanceKm: 45,
+      farePayout: Math.round(qty * 2500),
+      status: "AVAILABLE" as const,
+      isAccepted: false,
+    };
+
+    try {
+      const existingRequests = JSON.parse(localStorage.getItem("farmora_delivery_requests") || "[]");
+      localStorage.setItem("farmora_delivery_requests", JSON.stringify([newDeliveryRequest, ...existingRequests]));
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {}
+
+    try {
+      const token = localStorage.getItem("farmora_token");
+      if (token) {
+        fetch("/api/transport/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(newDeliveryRequest),
+        });
+      }
+    } catch (e) {}
+
     setBookings([newBooking, ...bookings]);
     if (onBookingCreated) onBookingCreated(newBooking);
     setSelectedWarehouse(null);
-    setSuccessMsg('Cold Storage space reserved successfully!');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    setSuccessMsg("Cold Storage space reserved! Transportation pickup request dispatched to Drivers.");
+    setTimeout(() => setSuccessMsg(""), 3000);
   };
 
   return (

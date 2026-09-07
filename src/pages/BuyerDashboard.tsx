@@ -248,6 +248,39 @@ export const BuyerDashboard: React.FC = () => {
 
     const updatedOrders = [newOrder, ...myOrders];
     setMyOrders(updatedOrders);
+
+    const newDeliveryRequest = {
+      id: Date.now(),
+      cropName: crop.name,
+      quantity: crop.quantity,
+      unit: crop.unit || "kg",
+      farmerName: crop.farmerName,
+      farmerLocation: crop.farmerLocation,
+      buyerName: appUser?.name || "Wholesale Buyer",
+      buyerLocation: "Wholesale Depot Hub, Mumbai",
+      pathType: "Farmer → Buyer" as const,
+      distanceKm: 165,
+      farePayout: Math.round(totalPrice * 0.1),
+      status: "AVAILABLE" as const,
+      isAccepted: false,
+    };
+
+    try {
+      const existingRequests = JSON.parse(localStorage.getItem("farmora_delivery_requests") || "[]");
+      localStorage.setItem("farmora_delivery_requests", JSON.stringify([newDeliveryRequest, ...existingRequests]));
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {}
+
+    try {
+      const token = localStorage.getItem("farmora_token");
+      if (token) {
+        fetch("/api/transport/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(newDeliveryRequest),
+        });
+      }
+    } catch (e) {}
     try {
       localStorage.setItem('farmora_buyer_orders', JSON.stringify(updatedOrders));
       

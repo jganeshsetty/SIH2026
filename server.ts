@@ -1,10 +1,24 @@
+// ============================================================================
+// Farmora Agricultural Platform - Express Server & API Gateway
+// ============================================================================
+
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { db } from "./src/db/index";
-import { users, crops, buyerRequests, transactions, transportRequests, trackingUpdates } from "./src/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import {
+  users,
+  crops,
+  buyerRequests,
+  transactions,
+  transportRequests,
+  trackingUpdates,
+  notifications,
+  storageBookings,
+  fpoMembers
+} from "./src/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { hashPassword, verifyPassword, generateToken } from "./src/lib/auth-utils";
 
@@ -12,35 +26,45 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // JSON request body parser
   app.use(express.json());
 
-  // API Routes
-  
-  // -- Auth Registration --
+  // ============================================================================
+  // 1. AUTHENTICATION & USER MANAGEMENT ROUTES
+  // ============================================================================
+
+  // Register new user (Farmer, Buyer, or Transporter)
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { email, password, name, role, phone, address } = req.body;
-      
+
       if (!email || !password || !name || !role) {
         return res.status(400).json({ error: "Missing required fields: email, password, name, role" });
       }
 
-      // Normalize role
+      // Normalize role string to system defaults
       let normalizedRole = role.toLowerCase();
       if (normalizedRole === 'farmer') normalizedRole = 'farmer';
       else if (normalizedRole === 'buyer') normalizedRole = 'buyer';
       else if (['transport_driver', 'transporter', 'driver'].includes(normalizedRole)) normalizedRole = 'transporter';
       else normalizedRole = 'buyer';
 
-      // Check if user already exists
-      const existingUser = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+      // Verify user uniqueness in PostgreSQL
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email.toLowerCase().trim()))
+        .limit(1);
+
       if (existingUser.length > 0) {
         return res.status(400).json({ error: "An account with this email address already exists. Please log in." });
       }
 
+      // Secure password hashing
       const passwordHash = hashPassword(password);
       const uid = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
+      // Insert new user into database
       const result = await db.insert(users).values({
         uid,
         email: email.toLowerCase().trim(),
@@ -77,7 +101,7 @@ async function startServer() {
     }
   });
 
-  // -- Auth Login --
+  // User authentication & JWT generation
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -85,7 +109,13 @@ async function startServer() {
         return res.status(400).json({ error: "Email and password are required" });
       }
 
-      const dbUsers = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+      // Query registered user
+      const dbUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email.toLowerCase().trim()))
+        .limit(1);
+
       if (dbUsers.length === 0) {
         return res.status(401).json({ error: "Invalid email or password" });
       }
@@ -98,6 +128,7 @@ async function startServer() {
         }
       }
 
+      // Generate session JWT token
       const token = generateToken({
         uid: user.uid,
         email: user.email,
@@ -123,7 +154,7 @@ async function startServer() {
     }
   });
 
-  // -- Current User Profile --
+  // Fetch current authenticated user profile
   app.get("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
     try {
       if (!req.dbUser && req.user) {
@@ -148,7 +179,7 @@ async function startServer() {
     }
   });
 
-  // -- Auth Sync --
+  // Sync external OAuth/Firebase authenticated user with PostgreSQL
   app.post("/api/auth/sync", requireAuth, async (req: AuthRequest, res) => {
     try {
       if (!req.user) return res.status(401).json({ error: "Unauthorized" });
@@ -214,7 +245,7 @@ async function startServer() {
     }
   });
 
-  // -- Update Preferred Language --
+  // Update user's preferred language setting
   app.post("/api/user/language", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { language } = req.body;
@@ -233,7 +264,11 @@ async function startServer() {
     }
   });
 
-  // -- Crops --
+  // ============================================================================
+  // 2. CROP MARKETPLACE & HARVEST LISTINGS
+  // ============================================================================
+
+  // Fetch all active crop harvest listings
   app.get("/api/crops", async (req, res) => {
     try {
       const allCrops = await db.select().from(crops).orderBy(desc(crops.createdAt));
@@ -244,6 +279,7 @@ async function startServer() {
     }
   });
 
+  // Create new crop harvest listing (Farmers only)
   app.post("/api/crops", requireAuth, async (req: AuthRequest, res) => {
     try {
       if (!req.dbUser || req.dbUser.role !== 'farmer') {
@@ -264,7 +300,11 @@ async function startServer() {
     }
   });
 
-  // -- Buyer Requests --
+  // ============================================================================
+  // 3. BUYER DEMANDS & PROCUREMENT
+  // ============================================================================
+
+  // Fetch wholesale buyer demands
   app.get("/api/buyer-requests", async (req, res) => {
     try {
       const requests = await db.select().from(buyerRequests).orderBy(desc(buyerRequests.createdAt));
@@ -274,6 +314,7 @@ async function startServer() {
     }
   });
 
+  // Submit buyer procurement demand (Buyers only)
   app.post("/api/buyer-requests", requireAuth, async (req: AuthRequest, res) => {
     try {
       if (!req.dbUser || req.dbUser.role !== 'buyer') {
@@ -292,7 +333,11 @@ async function startServer() {
     }
   });
 
-  // -- Transactions --
+  // ============================================================================
+  // 4. TRANSACTIONS & ESCROW
+  // ============================================================================
+
+  // Fetch transaction history
   app.get("/api/transactions", requireAuth, async (req: AuthRequest, res) => {
     try {
       const allTx = await db.select().from(transactions).orderBy(desc(transactions.createdAt));
@@ -302,6 +347,7 @@ async function startServer() {
     }
   });
 
+  // Initiate direct transaction & escrow lock
   app.post("/api/transactions", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { buyerRequestId, cropId, agreedPrice, agreedQuantity, fulfillmentMethod } = req.body;
@@ -330,7 +376,11 @@ async function startServer() {
     }
   });
 
-  // -- Transport Requests --
+  // ============================================================================
+  // 5. FREIGHT TRANSPORTATION & LIVE GPS TRACKING
+  // ============================================================================
+
+  // Fetch transport requests
   app.get("/api/transport-requests", async (req, res) => {
     try {
       const requests = await db.select().from(transportRequests).orderBy(desc(transportRequests.createdAt));
@@ -340,6 +390,7 @@ async function startServer() {
     }
   });
 
+  // Accept transport job (Transporters only)
   app.post("/api/transport-requests/assign", requireAuth, async (req: AuthRequest, res) => {
     try {
       if (!req.dbUser || !['transporter', 'transport_driver', 'driver'].includes(req.dbUser.role)) {
@@ -361,10 +412,13 @@ async function startServer() {
     }
   });
 
-  // -- AI Assistant with 10 Languages & Farmora Operations --
+  // ============================================================================
+  // 6. MULTILINGUAL AI ASSISTANT (10 LANGUAGES)
+  // ============================================================================
+
   app.post("/api/ai/chat", async (req, res) => {
     try {
-      const { message = '', language, userRole = 'farmer', pendingAction, context = {} } = req.body;
+      const { message = '', language, userRole = 'farmer', pendingAction } = req.body;
       const lower = message.toLowerCase().trim();
       const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
@@ -387,7 +441,7 @@ async function startServer() {
         if (typeof language === 'string' && language.length <= 5) detectedLangCode = language.toLowerCase();
       }
 
-      // Multilingual confirmation yes keywords
+      // Multilingual confirmation keywords
       const isAffirmative = /\b(yes|yeah|yup|confirm|proceed|ok|sure|हाँ|हां|होय|हो|ಹೌದು|అవును|ஆம்|ശരി|അതെ|হ্যাঁ|હા|ਹਾਂ)\b/i.test(lower);
       const isNegative = /\b(no|nope|cancel|stop|रद्द|नको|ಬೇಡ|వద్దు|வேண்டாம்|വേണ്ട|না|ના|ਨਹੀਂ)\b/i.test(lower);
 
@@ -415,12 +469,6 @@ async function startServer() {
 
         if (pendingAction.type === 'ADD_CROP') {
           const cropPayload = pendingAction.payload;
-          try {
-            if (req.headers.authorization) {
-              // Try authenticated insertion
-            }
-          } catch (e) {}
-
           const confirmReplies: Record<string, string> = {
             en: `Success! Added ${cropPayload.quantity} ${cropPayload.unit} of ${cropPayload.name} at ₹${cropPayload.expectedPrice}/${cropPayload.unit} to your listed produce. Direct buyers can now view and offer!`,
             hi: `सफलता! आपके ${cropPayload.name} की ${cropPayload.quantity} ${cropPayload.unit} को ₹${cropPayload.expectedPrice}/${cropPayload.unit} के भाव से सफलतापूर्वक जोड़ दिया गया है। थोक खरीदार अब इसे देख सकते हैं!`,
@@ -442,29 +490,17 @@ async function startServer() {
             detectedLanguage: detectedLangCode
           });
         }
-
-        if (pendingAction.type === 'ACCEPT_OFFER') {
-          const offerPayload = pendingAction.payload;
-          return res.json({
-            reply: `Offer accepted! Escrow payment of ₹${offerPayload.amount || '50,000'} has been initiated and logistics dispatch is scheduled.`,
-            actionExecuted: true,
-            action: 'OFFER_ACCEPTED',
-            detectedLanguage: detectedLangCode
-          });
-        }
       }
 
-      // 3. Operation Intent Detection
-      // A: Add Crop Intent
-      const addCropMatch = lower.match(/(add|list|जोडा|जोड़ें|ಸೇರಿಸಿ|జోడించండి|சேர்க்க|ചേർക്കുക|যোগ|ઉમેરો|ਸ਼ਾਮਲ)/i);
+      // 3. Intent Detection & Smart Guidance
+      const addCropMatch = lower.match(/(add|list|जोडा|जोड़ें|ಸೇರಿಸಿ|ಜೋడించండి|சேர்க்க|ചേർക്കുക|যোগ|ઉમેરો|ਸ਼ਾਮਲ)/i);
       if (addCropMatch && /(crop|harvest|tomato|potato|onion|wheat|शेतमाल|फसल|ಬೆಳೆ|పంట|பயிர்|വിള|ટોમેટો|ટામેટા|టమోటా|टोमॅटो|টমেটো)/i.test(lower)) {
-        // Extract quantity and crop name
         let cropName = 'Tomato';
-        if (/potato|बटाटा|आलू|ಆಲೂಗಡ್ಡೆ|బంగాళాదుంప|உருளை|ഉരുളക്കിഴങ്ങ്|আলু|બટાકા|ਆਲੂ/i.test(lower)) cropName = 'Potato';
-        else if (/onion|कांदा|प्याज|ಈರುಳ್ಳಿ|ఉల్లిపాయ|வெங்காயம்|ഉള്ളി|পেঁয়াজ|ડુંગળી|ਪਿਆਜ਼/i.test(lower)) cropName = 'Onion';
-        else if (/wheat|गहू|गेहूं|ಗೋಧಿ|గోధుమ|கோதுமை|ഗോതമ്പ്|গম|ઘઉં|ਕਣਕ/i.test(lower)) cropName = 'Wheat';
+        if (/potato|बटाटा|आलू|ಆಲೂಗಡ್ಡೆ|బంగాಳాదుంప|உരുளை|ഉരുളക്കിഴങ്ങ്|আলু|બટાકા|ਆਲੂ/i.test(lower)) cropName = 'Potato';
+        else if (/onion|कांदा|प्याज|ಈರುಳ್ಳಿ|ఉల్లిపాయ|வெங்காயம்|ഉള്ളി|പേঁയাজ|ડુંગળી|ਪਿਆਜ਼/i.test(lower)) cropName = 'Onion';
+        else if (/wheat|गहू|गेहूं|ಗೋಧಿ|ಗೋధుಮ|கோதுமை|ഗോതമ്പ്|গম|ઘઉં|ਕਣਕ/i.test(lower)) cropName = 'Wheat';
 
-        const qtyMatch = lower.match(/(\d+)\s*(kg|किलो|टन|ton|quintal|ਕਿਲੋ|கிலோ|కేజీ|ಕೆಜಿ)?/i);
+        const qtyMatch = lower.match(/(\d+)\s*(kg|किलो|टन|ton|quintal)?/i);
         const quantity = qtyMatch ? parseInt(qtyMatch[1]) : 100;
         const unit = qtyMatch && qtyMatch[2] ? qtyMatch[2] : 'kg';
         const expectedPrice = cropName === 'Tomato' ? 32 : cropName === 'Potato' ? 24 : cropName === 'Onion' ? 28 : 22;
@@ -493,76 +529,7 @@ async function startServer() {
         });
       }
 
-      // B: Market Intelligence / Sell or Store Decision
-      if (/(sell or store|which option|better|recommendation|सल्ला|विकू की साठवू|बेचें या स्टोर|ಮಾರಬೇಕೆ|అమ్మాలా|விற்கவா|വിൽക്കണോ|বিক্রি|વેચવો|ਵੇਚਾਂ)/i.test(lower)) {
-        const adviceReplies: Record<string, string> = {
-          en: 'Farmora AI Analysis: Tomato modal Mandi rate is ₹32/kg with 420 Tonnes arrival. Direct wholesale buyer demand is strong with immediate escrow payment. Selling 60% harvest now and storing 40% in nearby cold storage is optimal.',
-          hi: 'फार्मोरा एआई विश्लेषण: आज टमाटर का मंडी भाव ₹32/किलો है और मांग मजबूत है। तत्काल एस्क्रो भुगतान के साथ 60% फसल सीधे खरीदारों को बेचना और 40% कोल्ड स्टोरेज में रखना सबसे लाभदायक रहेगा।',
-          kn: 'ಫಾರ್ಮೋರಾ ಎಐ ವಿಶ್ಲೇಷಣೆ: ಇಂದು ಟೊಮೆಟೊ ಮಂಡಿ ಬೆಲೆ ₹32/ಕೆಜಿ ಇದೆ. 60% ಬೆಳೆಯನ್ನು ಈಗಲೇ ನೇರ ಖರೀದಿದಾರರಿಗೆ ಮಾರಿ ಮತ್ತು 40% ಬೆಳೆಯನ್ನು ಶೀತಲ ಸಂಗ್ರಹಾಗಾರದಲ್ಲಿಡುವುದು ಅತ್ಯುತ್ತಮ.',
-          mr: 'फार्मोरा एआय विश्लेषण: आज नाशिक बाजारपेठेत टोमॅटोचे दर ₹३२/किलो आहेत. मजबूत मागणी असल्याने ६०% माल थेट खरेदीदारांना त्वरित विकावा आणि ४०% माल कोल्ड स्टोरेजमध्ये साठवणे फायदेशीर ठरेल.',
-          te: 'ఫార్మోరా ఏఐ విశ్లేషణ: నేడు టమోటా మార్కెట్ ధర ₹32/కేజీగా ఉంది. 60% పంటను వెంటనే ప్రత్యక్ష కొనుగోలుదారులకు అమ్మడం మరియు 40% కోల్డ్ స్టోరేజ్‌లో ఉంచడం ప్రయోజనకరం.',
-          ta: 'பார்மோரா ஏஐ பகுப்பாய்வு: இன்றைய தக்காளி மண்டி விலை ₹32/கிலோ. 60% பயிரை வாங்குபவர்களுக்கு உடனடியாக விற்று, 40% குளிர்சாதன கிடங்கில் சேமிப்பது சிறந்தது.',
-          ml: 'ഫാർമോറ എഐ വിശകലനം: ഇന്നത്തെ തക്കാളി വില ₹32/കിലോ ആണ്. 60% ഇപ്പോൾ നേരിട്ട് വിൽക്കുകയും 40% കോൾഡ് സ്റ്റോറേജിൽ സൂക്ഷിക്കുകയും ചെയ്യുന്നത് ലാഭകരമാണ്.',
-          bn: 'ফার্মোরা এআই বিশ্লেষণ: আজ টমেটোর মান্ডি দর ₹৩২/কেজি। ৬০% ফসল সরাসরি পাইকারি ক্রেতাদের কাছে বিক্রি করা এবং ৪০% কোল্ড স্টোরেজে রাখা সবচেয়ে লাভজনক হবে।',
-          gu: 'ફાર્મોરા એઆઈ વિશ્લેષણ: આજે ટામેટાંનો મંડી ભાવ ₹32/કિલો છે. 60% પાક હમણાં સીધા ખરીદદારોને વેચવો અને 40% કોલ્ડ સ્ટોરેજમાં સંગ્રહ કરવો સૌથી ફાયદાકારક રહેશે.',
-          pa: 'ਫਾਰਮੋਰਾ ਏਆਈ ਵਿਸ਼ਲੇਸ਼ਣ: ਅੱਜ ਟਮਾਟਰ ਦਾ ਮੰਡੀ ਭਾਅ ₹32/ਕਿਲੋ ਹੈ। 60% ਫਸਲ ਤੁਰੰਤ ਵੇਚਣਾ ਅਤੇ 40% ਕੋਲਡ ਸਟੋਰੇਜ ਵਿੱਚ ਰੱਖਣਾ ਸਭ ਤੋਂ ਵਧੀਆ ਰਹੇਗਾ।'
-        };
-
-        return res.json({
-          reply: adviceReplies[detectedLangCode] || adviceReplies.en,
-          action: 'NAVIGATE_TAB',
-          tab: 'advisor',
-          detectedLanguage: detectedLangCode
-        });
-      }
-
-      // C: Show Buyer Offers
-      if (/(offer|buyer offer|offers|ऑफर|प्रस्ताव|కొనుగోలుదారుల|ಕೊಡುಗೆಗಳು|சலுகைகள்|ഓഫറുകൾ|অফার|ઑફર્સ|ਪੇਸ਼ਕਸ਼)/i.test(lower)) {
-        const offerReplies: Record<string, string> = {
-          en: 'You have 2 active wholesale buyer offers: Reliance Fresh offered ₹50,000 for 5,000 kg Tomato, and BigBasket Agro offered ₹33,000. Both are 100% escrow backed.',
-          hi: 'आपके पास 2 सक्रिय खरीदार प्रस्ताव हैं: रिलायंस फ्रेश ने ₹50,000 और बिगबास्केट एग्रो ने ₹33,000 का प्रस्ताव दिया है। दोनों 100% एस्क्रो सुरक्षित हैं।',
-          kn: 'ನಿಮಗೆ 2 ಸಕ್ರಿಯ ಖರೀದಿದಾರರ ಕೊಡುಗೆಗಳಿವೆ: ರಿಲಯನ್ಸ್ ಫ್ರೆಶ್ ₹50,000 ಮತ್ತು ಬಿಗ್‌ಬಾಸ್ಕೆಟ್ ₹33,000 ಆಫರ್ ಮಾಡಿದೆ. ಎರಡೂ ಎಸ್ಕ್ರೋ ಸುರಕ್ಷಿತವಾಗಿವೆ.',
-          mr: 'आपल्याकडे २ थेट खरेदीदार ऑफर्स आहेत: रिलायन्स फ्रेशने ₹५०,००० आणि बिगबास्केट ॲग्रोने ₹३३,००० ची ऑफर दिली आहे. दोन्ही एस्क्रो सुरक्षित आहेत.',
-          te: 'మీకు 2 కొనుగోలుదారుల ఆఫర్లు ఉన్నాయి: రిలయన్స్ ఫ్రెష్ ₹50,000 మరియు బిగ్‌బాస్కెట్ ₹33,000 ఆఫర్ చేశాయి. రెండూ ఎస్క్రో రక్షితమైనవి.',
-          ta: 'உங்களிடம் 2 சலுகைகள் உள்ளன: ரிலையன்ஸ் பிரெஷ் ₹50,000 மற்றும் பிக்பாஸ்கெட் ₹33,000 சலுகை அளித்துள்ளன. இரண்டும் எஸ்க்ரோ பாதுகாக்கப்பட்டவை.',
-          ml: 'നിങ്ങൾക്ക് 2 ഓഫറുകൾ ലഭിച്ചിട്ടുണ്ട്: റിലയൻസ് ഫ്രഷ് ₹50,000, ബിഗ്ബാസ്കറ്റ് ₹33,000 വാഗ്ദാനം ചെയ്തു. രണ്ടും എസ്‌ക്രോ സുരക്ഷിതമാണ്.',
-          bn: 'আপনার কাছে ২টি সক্রিয় অফার রয়েছে: রিলায়েন্স ফ্রেশ ₹৫০,০০০ এবং বিগবাস্কেট ₹৩৩,০০০ প্রস্তাব করেছে। দুটিই এসক্রো সুরক্ষিত।',
-          gu: 'તમારી પાસે 2 સક્રિય ખરીદદાર ઑફર્સ છે: રિલાયન્સ ફ્રેશ તરફથી ₹50,000 અને બિગબાસ્કેટ તરફથી ₹33,000. બંને એસ્ક્રો સુરક્ષિત છે.',
-          pa: 'ਤੁਹਾਡੇ ਕੋਲ 2 ਸਰਗਰਮ ਖਰੀਦਦਾਰ ਪੇਸ਼ਕਸ਼ਾਂ ਹਨ: ਰਿਲਾਇੰਸ ਫਰੈਸ਼ ਵੱਲੋਂ ₹50,000 ਅਤੇ ਬਿਗਬਾਸਕੇਟ ਵੱਲੋਂ ₹33,000। ਦੋਵੇਂ ਐਸਕਰੋ ਸੁਰੱਖਿਅਤ ਹਨ।'
-        };
-
-        return res.json({
-          reply: offerReplies[detectedLangCode] || offerReplies.en,
-          action: 'NAVIGATE_TAB',
-          tab: 'buyers',
-          detectedLanguage: detectedLangCode
-        });
-      }
-
-      // D: Track Transportation / Where is my truck
-      if (/(truck|transport|tracking|where is|वाहतूक|ट्रक|ಗಾಡಿ|ట్రక్|லாரி|ലോറി|ট্রাক|ટ્રક)/i.test(lower)) {
-        const trackingReplies: Record<string, string> = {
-          en: 'Freight Status: Driver Ramesh Shinde with vehicle MH-15-EG-4921 is in transit. GPS coordinates: 19.9975° N, 73.7898° E (Nashik Highway). Estimated arrival tomorrow at 2:00 PM.',
-          hi: 'माल ढुलाई स्थिति: वाहन MH-15-EG-4921 के साथ चालक रमेश शिंदे रास्ते में हैं। वर्तमान स्थान: नासिक हाईवे। कल दोपहर 2:00 बजे तक पहुंचने का अनुमान है।',
-          kn: 'ಸಾರಿಗೆ ಸ್ಥಿತಿ: ವಾಹನ MH-15-EG-4921 ಚಾಲಕ ರಮೇಶ್ ಶಿಂಧೆ ದಾರಿಯಲ್ಲಿದ್ದಾರೆ. ಪ್ರಸ್ತುತ ಸ್ಥಳ: ನಾಸಿಕ್ ಹೆದ್ದಾರಿ. ನಾಳೆ ಮಧ್ಯಾಹ್ਨ 2:00 ಗಂಟೆಗೆ ತಲುಪಲಿದ್ದಾರೆ.',
-          mr: 'वाहतूक स्थिती: चालक रमेश शिंदे (वाहन क्र. MH-15-EG-4921) मार्गावर आहेत. सध्याचे स्थान: नाशिक महामार्ग. उद्या दुपारी २:०० वाजता पोहोचण्याचा अंदाज आहे.',
-          te: 'రవాణా స్థితి: డ్రైవర్ రమేష్ షిండే (వాహనం MH-15-EG-4921) మార్గంలో ఉన్నారు. ప్రస్తుతం నాసిక్ హైవే వద్ద ఉన్నారు. రేపు మధ్యాహ్నం 2:00 గంటలకు చేరుకుంటారు.',
-          ta: 'போக்குவரத்து நிலை: ஓட்டுநர் ரமேஷ் ஷிண்டே (வாகனம் MH-15-EG-4921) வழியில் உள்ளார். நாசிக் நெடுஞ்சಾಲையில் உள்ளார். நாளை மதியம் 2:00 மணிக்கு வந்து சேருவார்.',
-          ml: 'ചരക്കുനീക്ക നില: ഡ്രൈവർ രമേഷ് ഷിൻഡെ (വാഹനം MH-15-EG-4921) യാത്രാമധ്യേയാണ്. നാസിക് ഹൈവേയിലാണ് ഇപ്പോൾ. നാളെ ഉച്ചയ്ക്ക് 2:00 മണിക്ക് എത്തും.',
-          bn: 'পরিবহন অবস্থা: চালক রমেশ শিন্ডে (গাড়ি নং MH-15-EG-4921) পথে রয়েছেন। বর্তমান অবস্থান: নাসিক হাইওয়ে। আগামীকাল দুপুর ২:০০ টায় পৌঁছানোর সম্ভাবনা রয়েছে।',
-          gu: 'પરિવહન સ્થિતિ: વાહન MH-15-EG-4921 સાથે ડ્રાઇવર રમેશ શિંદે રસ્તામાં છે. હાલનું સ્થાન: નાશિક હાઇવે. આવતીકાલે બપોરે 2:00 વાગ્યે પહોંચવાનો અંદાજ છે.',
-          pa: 'ਮਾਲ ਢੋਆ-ਢੁਆਈ ਸਥਿਤੀ: ਵਾਹਨ MH-15-EG-4921 ਦੇ ਡਰਾਈਵਰ ਰਮੇਸ਼ ਸ਼ਿੰਦੇ ਰਸਤੇ ਵਿੱਚ ਹਨ। ਮੌਜੂਦਾ ਸਥਾਨ: ਨਾਸਿਕ ਹਾਈਵੇਅ। ਕੱਲ੍ਹ ਦੁਪਹਿਰ 2:00 ਵਜੇ ਪਹੁੰਚਣਗੇ।'
-        };
-
-        return res.json({
-          reply: trackingReplies[detectedLangCode] || trackingReplies.en,
-          action: 'NAVIGATE_TAB',
-          tab: 'transport',
-          detectedLanguage: detectedLangCode
-        });
-      }
-
-      // 4. Default Intelligent Fallback or Gemini Generation
+      // 4. Default Gemini Generation or Multilingual Fallback
       if (apiKey) {
         try {
           const ai = new GoogleGenAI({ apiKey });
@@ -594,13 +561,12 @@ User query: ${message}`;
         }
       }
 
-      // Default multilingual general response
       const defaultReplies: Record<string, string> = {
         en: `Farmora AI: Regarding "${message}", our intelligent agricultural marketplace enables direct trading between farmers and wholesale buyers with verified Mandi rates, cold storage booking, and live GPS freight tracking.`,
         hi: `फार्मोरा एआई: "${message}" के संबंध में, हमारा कृषि मंच सत्यापित मंडी दरों, कोल्ड स्टोरेज और जीपीएस माल ट्रैकिंग के साथ किसानों और थोक खरीदारों को सीधे जोड़ता है।`,
         kn: `ಫಾರ್ಮೋರಾ ಎಐ: "${message}" ಬಗ್ಗೆ, ನಮ್ಮ ಕೃಷಿ ವೇದಿಕೆಯು ಮಂಡಿ ಬೆಲೆಗಳು, ಶೀತಲ ಸಂಗ್ರಹಾಗಾರ ಮತ್ತು ಜಿಪಿಎಸ್ ಟ್ರ್ಯಾಕಿಂಗ್‌ನೊಂದಿಗೆ ರೈತರು ಮತ್ತು ಖರೀದಿದಾರರನ್ನು ನೇರವಾಗಿ ಸಂಪರ್ಕಿಸುತ್ತದೆ.`,
         mr: `फार्मोरा एआय: "${message}" बाबत, आपले व्यासपीठ थेट शेतमाल विक्री, खात्रीशीर बाजारभाव, कोल्ड स्टोरेज साठवणूक आणि थेट वाहतूक ट्रॅकिंगची सुविधा देते.`,
-        te: `ఫార్మోరా ఏఐ: "${message}" కు సంబంధించి, మా వేదిక మార్కెట్ ధరలు, కోల్డ్ స్టోరేజ్ మరియు జీపీఎస్ ట్రాకింగ్‌తో రైతులు మరియు కొనుగోలుదారులను నేరుగా కలుపుతుంది.`,
+        te: `ఫార్మోరా ఏఐ: "${message}" కు సంబంధించి, మా వేదిక మార్కెట్ ధరలు, కోల్డ్ స్టോరేజ్ మరియు జీపీఎస్ ట్రాకింగ్‌తో రైతులు మరియు కొనుగోలుదారులను నేరుగా కలుపుతుంది.`,
         ta: `பார்மோரா ஏஐ: "${message}" பற்றி, எங்கள் விவசாய தளம் நேரடி வர்த்தகம், மண்டி விலை, குளிர்சாதன கிடங்கு மற்றும் ஜிபிஎஸ் சரக்கு கண்காணிப்பை வழங்குகிறது.`,
         ml: `ഫാർമോറ എഐ: "${message}" സംബന്ധിച്ച്, ഞങ്ങളുടെ പ്ലാറ്റ്‌ഫോം വിപണി വില, കോൾഡ് സ്റ്റോറേജ്, ജിപിഎസ് ട്രാക്കിംഗ് എന്നിവ ഉറപ്പാക്കുന്നു.`,
         bn: `ফার্মোরা এআই: "${message}" সম্পর্কে, আমাদের কৃষি প্ল্যাটফর্ম সরাসরি বাণিজ্য, কোল্ড স্টোরেজ এবং জিপিএস ট্র্যাকিং প্রদান করে।`,
@@ -620,9 +586,11 @@ User query: ${message}`;
     }
   });
 
-  // -- Farmora Ecosystem API Endpoints --
+  // ============================================================================
+  // 7. COLD STORAGE & FPO ECOSYSTEM ENDPOINTS
+  // ============================================================================
 
-  // Mandi Intelligence
+  // APMC Mandi price intelligence
   app.get("/api/market/intelligence", async (req, res) => {
     try {
       const { BENCHMARK_MANDI_PRICES } = await import('./src/services/marketData');
@@ -632,7 +600,7 @@ User query: ${message}`;
     }
   });
 
-  // Buyer Demands
+  // Buyer demands benchmark
   app.get("/api/market/demands", async (req, res) => {
     try {
       const { BENCHMARK_BUYER_DEMANDS } = await import('./src/services/marketData');
@@ -642,7 +610,7 @@ User query: ${message}`;
     }
   });
 
-  // Storage Warehouses
+  // Cold storage warehouse facilities
   app.get("/api/storage/warehouses", async (req, res) => {
     try {
       const { BENCHMARK_WAREHOUSES } = await import('./src/services/marketData');
@@ -652,7 +620,7 @@ User query: ${message}`;
     }
   });
 
-  // FPOs
+  // Farmers Producer Organizations list
   app.get("/api/fpos", async (req, res) => {
     try {
       const { BENCHMARK_FPOS } = await import('./src/services/marketData');
@@ -662,7 +630,7 @@ User query: ${message}`;
     }
   });
 
-  // Buyer Trust Rating
+  // Buyer trust rating profile
   app.get("/api/buyers/:id/trust", async (req, res) => {
     try {
       const buyerId = parseInt(req.params.id);
@@ -685,7 +653,247 @@ User query: ${message}`;
     }
   });
 
-  // Vite Integration in Development Mode
+  // Notifications API
+  app.get("/api/notifications", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const userNotifications = await db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.userId, req.dbUser.id))
+        .orderBy(desc(notifications.createdAt));
+      res.json(userNotifications);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Storage booking creation
+  app.post("/api/storage/book", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const { warehouseId, cropName, quantityTonnes, durationMonths, totalCost } = req.body;
+      const booking = await db.insert(storageBookings).values({
+        farmerId: req.dbUser.id,
+        warehouseId,
+        cropName,
+        quantityTonnes: parseFloat(quantityTonnes),
+        durationMonths: parseInt(durationMonths),
+        totalCost: parseFloat(totalCost),
+        status: 'ACTIVE'
+      }).returning();
+      
+      await db.insert(notifications).values({
+        userId: req.dbUser.id,
+        title: 'Cold Storage Confirmed',
+        message: `Reserved ${quantityTonnes} Tonnes space for ${cropName}. Total: ₹${totalCost}`,
+        type: 'SUCCESS'
+      });
+
+      res.json(booking[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to book storage" });
+    }
+  });
+
+  // FPO Membership joining
+  app.post("/api/fpo/join", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const { fpoId, cropName, committedQuantity } = req.body;
+      const membership = await db.insert(fpoMembers).values({
+        fpoId: parseInt(fpoId),
+        farmerId: req.dbUser.id,
+        cropName,
+        committedQuantity: parseFloat(committedQuantity),
+      }).returning();
+
+      await db.insert(notifications).values({
+        userId: req.dbUser.id,
+        title: 'FPO Produce Aggregated',
+        message: `Committed ${committedQuantity} kg of ${cropName} to FPO bulk pool.`,
+        type: 'SUCCESS'
+      });
+
+      res.json(membership[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to join FPO" });
+    }
+  });
+
+  // Transport quality verification submission
+  app.post("/api/transport/verify", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser || req.dbUser.role !== 'transporter') {
+        return res.status(403).json({ error: "Only transport drivers can submit quality verification" });
+      }
+      const { requestId, cropPhotoUrl, verificationDetails, status } = req.body;
+      const updated = await db.update(transportRequests)
+        .set({
+          cropPhotoUrl,
+          qualityVerified: true,
+          verificationDetails,
+          verificationTimestamp: new Date(),
+          status: status || 'QUALITY_VERIFIED'
+        })
+        .where(eq(transportRequests.id, requestId))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to submit quality verification" });
+    }
+  });
+
+  // Get available transport delivery requests for drivers
+  app.get("/api/transport/available", async (req, res) => {
+    try {
+      const available = await db.select()
+        .from(transportRequests)
+        .where(eq(transportRequests.status, 'AVAILABLE'))
+        .orderBy(desc(transportRequests.createdAt));
+      res.json(available);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch available delivery requests" });
+    }
+  });
+
+  // Create a new transport request
+  app.post("/api/transport/requests", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { 
+        transactionId, 
+        cropName, 
+        quantity, 
+        unit, 
+        farmerName, 
+        buyerName, 
+        pickupLocation, 
+        dropLocation, 
+        pathType, 
+        distanceKm, 
+        farePayout 
+      } = req.body;
+
+      const created = await db.insert(transportRequests).values({
+        transactionId: transactionId ? parseInt(transactionId) : null,
+        cropName: cropName || 'Agricultural Produce',
+        quantity: quantity ? parseFloat(quantity) : 1000,
+        unit: unit || 'kg',
+        farmerName: farmerName || req.dbUser?.name || 'Farmer',
+        buyerName: buyerName || 'Wholesale Buyer',
+        pickupLocation,
+        dropLocation,
+        pathType: pathType || 'Farmer → Buyer',
+        distanceKm: distanceKm ? parseFloat(distanceKm) : 150,
+        farePayout: farePayout ? parseFloat(farePayout) : 15000,
+        status: 'AVAILABLE'
+      }).returning();
+
+      res.json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to create transport request" });
+    }
+  });
+
+  // Driver Accepts Delivery Request
+  app.post("/api/transport/accept", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser || req.dbUser.role !== 'transporter') {
+        return res.status(403).json({ error: "Only transport drivers can accept delivery requests" });
+      }
+
+      const { requestId } = req.body;
+      const updated = await db.update(transportRequests)
+        .set({
+          transporterId: req.dbUser.id,
+          status: 'ACCEPTED'
+        })
+        .where(eq(transportRequests.id, requestId))
+        .returning();
+
+      const reqDetails = updated[0];
+
+      // Notify Farmer
+      if (reqDetails && reqDetails.farmerName) {
+        await db.insert(notifications).values({
+          userId: req.dbUser.id, // Notification log
+          title: 'Transport Driver Assigned',
+          message: `Driver ${req.dbUser.name} accepted delivery #${requestId} for ${reqDetails.cropName}. Pickup route generated.`,
+          type: 'INFO'
+        });
+      }
+
+      res.json(reqDetails);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to accept transport request" });
+    }
+  });
+
+  // Update Transport Status (PICKUP_STARTED, IN_TRANSIT, DELIVERED, COMPLETED)
+  app.post("/api/transport/status", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { requestId, status } = req.body;
+      const updated = await db.update(transportRequests)
+        .set({ status })
+        .where(eq(transportRequests.id, requestId))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to update transport status" });
+    }
+  });
+
+  // Mandi price trends API
+  app.get("/api/market/trends", async (req, res) => {
+    try {
+      const trends = [
+        { crop: 'Tomato', currentRate: 32, prevRate: 28, trend: 'UP', changePercent: 14.2, forecast: 'High wholesale demand expected in Mumbai & Thane markets' },
+        { crop: 'Potato', currentRate: 22, prevRate: 24, trend: 'DOWN', changePercent: -8.3, forecast: 'Cold storage supply arrival lowering local Mandi prices' },
+        { crop: 'Onion', currentRate: 45, prevRate: 40, trend: 'UP', changePercent: 12.5, forecast: 'Export demand surge driving APMC Lasalgaon prices higher' },
+        { crop: 'Wheat', currentRate: 26, prevRate: 25, trend: 'STABLE', changePercent: 4.0, forecast: 'Steady procurement across regional government hubs' }
+      ];
+      res.json(trends);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch price trends" });
+    }
+  });
+
+  // GPS Telemetry updates
+  app.post("/api/tracking/update", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { transportRequestId, lat, lng } = req.body;
+      const update = await db.insert(trackingUpdates).values({
+        transportRequestId: parseInt(transportRequestId),
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+      }).returning();
+      res.json(update[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to update tracking telemetry" });
+    }
+  });
+
+  // Fetch telemetry history
+  app.get("/api/tracking/history/:requestId", async (req, res) => {
+    try {
+      const transportRequestId = parseInt(req.params.requestId);
+      const updates = await db
+        .select()
+        .from(trackingUpdates)
+        .where(eq(trackingUpdates.transportRequestId, transportRequestId))
+        .orderBy(desc(trackingUpdates.timestamp));
+      res.json(updates);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch tracking history" });
+    }
+  });
+
+  // ============================================================================
+  // 8. VITE MIDDLEWARE & SERVER LAUNCH
+  // ============================================================================
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -717,7 +925,6 @@ User query: ${message}`;
       }
     });
   } else {
-    // Production Mode
     const distPath = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {

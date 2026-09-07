@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Crop, MandiPrice, Warehouse, BuyerDemand, AiRecommendation } from '../types';
-import { generateAiMarketAdvisorRecommendation } from '../services/aiAdvisor';
-import { Sparkles, TrendingUp, Archive, Users, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Crop, MandiPrice, Warehouse, BuyerDemand, AiRecommendation } from "../types";
+import { generateAiMarketAdvisorRecommendation } from "../services/aiAdvisor";
+import { Sparkles, TrendingUp, Archive, Users, CheckCircle2, ArrowRight, RefreshCw } from "lucide-react";
 
 interface Props {
   crop: Crop;
   mandiPrices: MandiPrice[];
   warehouses: Warehouse[];
   demands: BuyerDemand[];
-  onExecuteAction?: (action: 'SELL_NOW' | 'STORE' | 'AGGREGATE') => void;
+  onExecuteAction?: (action: "SELL_NOW" | "STORE" | "AGGREGATE") => void;
 }
 
+/**
+ * Farmora AI Market Advisor Card Component
+ * Displays real-time decision recommendations (SELL NOW vs STORE vs AGGREGATE)
+ * with revenue projections and AI-driven market analysis.
+ */
 export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, warehouses, demands, onExecuteAction }) => {
   const [recommendation, setRecommendation] = useState<AiRecommendation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,13 +38,13 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
     loadRecommendation();
   }, [crop]);
 
-  // Simulate market dynamics changing over time if the user takes no action
+  // Simulate dynamic market updates over time
   useEffect(() => {
     if (loading || !recommendation) return;
-    
+
     const interval = setInterval(() => {
-      setTimeElapsed(prev => prev + 1);
-    }, 5000); // Check every 5 seconds for demo purposes
+      setTimeElapsed((prev) => prev + 1);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [loading, recommendation]);
@@ -47,35 +52,35 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
   useEffect(() => {
     if (!recommendation) return;
 
-    if (timeElapsed === 2) { // After 10 seconds (2 * 5s)
-      setRecommendation(prev => {
+    if (timeElapsed === 2) {
+      setRecommendation((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          action: 'STORE',
-          headline: 'Market Shift Detected: Store crop due to sudden price drop',
+          action: "STORE",
+          headline: "Market Shift Detected: Store crop due to sudden price drop",
           reasoning: [
             ...prev.reasoning,
-            'URGENT: Live market prices just dropped by 4% in your local Mandi.',
-            'Quality is holding up well; storing for 2 weeks will yield better returns.'
+            "URGENT: Live market prices just dropped by 4% in your local Mandi.",
+            "Quality is holding up well; storing for 2 weeks will yield better returns.",
           ],
           financialProjection: {
             ...prev.financialProjection,
-            immediateSaleRevenue: prev.financialProjection.immediateSaleRevenue * 0.96
-          }
+            immediateSaleRevenue: prev.financialProjection.immediateSaleRevenue * 0.96,
+          },
         };
       });
-    } else if (timeElapsed === 4) { // After 20 seconds
-      setRecommendation(prev => {
+    } else if (timeElapsed === 4) {
+      setRecommendation((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          action: 'AGGREGATE',
-          headline: 'Quality Degrading: Aggregate with FPO to sell in bulk immediately',
+          action: "AGGREGATE",
+          headline: "Quality Degrading: Aggregate with FPO to sell in bulk immediately",
           reasoning: [
-            'URGENT: Freshness degrading. FPO bulk buyers are offering immediate pickup.',
-            'Avoid storage costs and further quality degradation.'
-          ]
+            "URGENT: Freshness degrading. FPO bulk buyers are offering immediate pickup.",
+            "Avoid storage costs and further quality degradation.",
+          ],
         };
       });
     }
@@ -93,20 +98,19 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
   if (!recommendation) return null;
 
   const actionColors = {
-    SELL_NOW: 'bg-emerald-600 text-white',
-    STORE: 'bg-amber-600 text-white',
-    AGGREGATE: 'bg-indigo-600 text-white'
+    SELL_NOW: "bg-emerald-600 text-white",
+    STORE: "bg-amber-600 text-white",
+    AGGREGATE: "bg-indigo-600 text-white",
   };
 
   const actionIcons = {
     SELL_NOW: <TrendingUp className="w-5 h-5" />,
     STORE: <Archive className="w-5 h-5" />,
-    AGGREGATE: <Users className="w-5 h-5" />
+    AGGREGATE: <Users className="w-5 h-5" />,
   };
 
   return (
     <div className="p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-2 border-[#10b981]/40 shadow-2xl space-y-6">
-      
       {/* Header & Action Badge */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#10b981]/25 pb-4">
         <div className="flex items-center gap-3">
@@ -119,8 +123,11 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
           </div>
         </div>
 
-        <button 
-          onClick={() => { setTimeElapsed(0); loadRecommendation(); }}
+        <button
+          onClick={() => {
+            setTimeElapsed(0);
+            loadRecommendation();
+          }}
           className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-white border border-[#10b981]/30 text-xs font-extrabold text-[#065f46] hover:bg-[#e1f2e6] transition-colors flex items-center gap-1.5 shadow-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -133,11 +140,9 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
         <div className="flex items-center justify-between">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl text-xs font-black bg-white/20 backdrop-blur-md">
             {actionIcons[recommendation.action]}
-            <span>RECOMMENDED DECISION: {recommendation.action.replace('_', ' ')}</span>
+            <span>RECOMMENDED DECISION: {recommendation.action.replace("_", " ")}</span>
           </div>
-          <span className="text-xs font-bold text-[#a7f3d0]">
-            Confidence: {recommendation.confidenceScore}%
-          </span>
+          <span className="text-xs font-bold text-[#a7f3d0]">Confidence: {recommendation.confidenceScore}%</span>
         </div>
 
         <h4 className="text-lg font-black text-white">{recommendation.headline}</h4>
@@ -146,11 +151,13 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs font-bold border-t border-white/20">
           <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm">
             <span className="text-[10px] text-[#a7f3d0] uppercase block font-semibold">IMMEDIATE SALE REVENUE</span>
-            <span className="text-base font-black">₹{recommendation.financialProjection.immediateSaleRevenue.toLocaleString('en-IN')}</span>
+            <span className="text-base font-black">₹{recommendation.financialProjection.immediateSaleRevenue.toLocaleString("en-IN")}</span>
           </div>
           <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm">
             <span className="text-[10px] text-[#a7f3d0] uppercase block font-semibold">PROJECTED STORAGE NET REVENUE</span>
-            <span className="text-base font-black">₹{recommendation.financialProjection.projectedStorageRevenueNet.toLocaleString('en-IN')}</span>
+            <span className="text-base font-black">
+              ₹{recommendation.financialProjection.projectedStorageRevenueNet.toLocaleString("en-IN")}
+            </span>
           </div>
         </div>
       </div>
@@ -170,16 +177,16 @@ export const AiMarketAdvisorCard: React.FC<Props> = ({ crop, mandiPrices, wareho
 
       {/* Action Steps & Execute Button */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-[#10b981]/20">
-        <div className="text-xs text-gray-500 font-medium italic max-w-md">
-          {recommendation.disclaimer}
-        </div>
+        <div className="text-xs text-gray-500 font-medium italic max-w-md">{recommendation.disclaimer}</div>
 
         {onExecuteAction && (
           <button
             onClick={() => onExecuteAction(recommendation.action)}
-            className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 hover:scale-102 ${actionColors[recommendation.action]}`}
+            className={`w-full sm:w-auto px-6 py-3 rounded-2xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 hover:scale-102 ${
+              actionColors[recommendation.action]
+            }`}
           >
-            <span>EXECUTE {recommendation.action.replace('_', ' ')}</span>
+            <span>EXECUTE {recommendation.action.replace("_", " ")}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         )}

@@ -61,9 +61,42 @@ export const FpoManagementModule: React.FC<Props> = ({ userCrops = [], onOfferCr
       joinedDate: new Date().toISOString().split('T')[0]
     };
 
+    const newDeliveryRequest = {
+      id: Date.now(),
+      cropName: newCropName,
+      quantity: parseFloat(newQuantity),
+      unit: "kg",
+      farmerName: "Ganesh (Farmer)",
+      farmerLocation: "Central Agro Zone, Nashik, Maharashtra",
+      buyerName: myFpo?.name || "Sahyadri FPO Aggregation Hub",
+      buyerLocation: "Dindori Road Agri Cluster, Nashik, MH",
+      pathType: "Farmer → FPO" as const,
+      distanceKm: 28,
+      farePayout: Math.round(parseFloat(newQuantity) * 2.5),
+      status: "AVAILABLE" as const,
+      isAccepted: false,
+    };
+
+    try {
+      const existingRequests = JSON.parse(localStorage.getItem("farmora_delivery_requests") || "[]");
+      localStorage.setItem("farmora_delivery_requests", JSON.stringify([newDeliveryRequest, ...existingRequests]));
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {}
+
+    try {
+      const token = localStorage.getItem("farmora_token");
+      if (token) {
+        fetch("/api/transport/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(newDeliveryRequest),
+        });
+      }
+    } catch (e) {}
+
     setMembersProduce([newMember, ...membersProduce]);
-    setSuccessMsg('Your produce committed to FPO bulk pool successfully!');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    setSuccessMsg("Produce committed to FPO bulk pool! Transportation request dispatched to Drivers.");
+    setTimeout(() => setSuccessMsg(""), 3000);
   };
 
   const handleCreateBulkOffer = () => {

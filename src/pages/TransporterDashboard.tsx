@@ -96,7 +96,7 @@ const INITIAL_REQUESTS: DeliveryRequest[] = [
 
 export const TransporterDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, appUser, logout } = useAuth();
+  const { user, appUser, token, logout } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'available' | 'active'>('available');
 
@@ -134,6 +134,43 @@ export const TransporterDashboard: React.FC = () => {
   const [inspectionPhoto, setInspectionPhoto] = useState('https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80');
   const [toastMsg, setToastMsg] = useState('');
 
+  // Sync available deliveries from PostgreSQL backend
+  useEffect(() => {
+    const fetchAvailableFromBackend = async () => {
+      try {
+        const res = await fetch('/api/transport/available');
+        if (res.ok) {
+          const backendRequests = await res.json();
+          if (Array.isArray(backendRequests) && backendRequests.length > 0) {
+            const mapped: DeliveryRequest[] = backendRequests.map((r: any) => ({
+              id: r.id,
+              cropName: r.cropName || 'Crop Produce',
+              quantity: r.quantity || 5000,
+              unit: r.unit || 'kg',
+              farmerName: r.farmerName || 'Farmer',
+              farmerLocation: r.pickupLocation,
+              buyerName: r.buyerName || 'Wholesale Buyer',
+              buyerLocation: r.dropLocation,
+              pathType: (r.pathType as any) || 'Farmer → Buyer',
+              distanceKm: r.distanceKm || 150,
+              farePayout: r.farePayout || 18000,
+              status: r.status || 'AVAILABLE',
+              isAccepted: r.status !== 'AVAILABLE'
+            }));
+            setDeliveries(prev => {
+              const ids = new Set(mapped.map(m => m.id));
+              const filteredPrev = prev.filter(p => !ids.has(p.id));
+              return [...mapped, ...filteredPrev];
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Backend transport endpoint fetch fallback:', err);
+      }
+    };
+    fetchAvailableFromBackend();
+  }, []);
+
   // Sync active delivery to localStorage for cross-portal visibility
   useEffect(() => {
     if (activeDelivery) {
@@ -142,16 +179,28 @@ export const TransporterDashboard: React.FC = () => {
     }
   }, [activeDelivery]);
 
-  const handleAcceptDelivery = (delivery: DeliveryRequest) => {
+  const handleAcceptDelivery = async (delivery: DeliveryRequest) => {
     const updated: DeliveryRequest = {
       ...delivery,
       isAccepted: true,
       status: 'PICKUP'
     };
 
+    try {
+      if (token) {
+        await fetch('/api/transport/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ requestId: delivery.id })
+        });
+      }
+    } catch (e) {
+      console.warn('Backend accept transport request error:', e);
+    }
+
     setDeliveries(prev => prev.map(d => d.id === delivery.id ? updated : d));
     setActiveDelivery(updated);
-    localStorage.setItem('farmora_delivery_requests', JSON.stringify(deliveries));
+    localStorage.setItem('farmora_delivery_requests', JSON.stringify(deliveries.map(d => d.id === delivery.id ? updated : d)));
     localStorage.setItem('farmora_active_delivery', JSON.stringify(updated));
     window.dispatchEvent(new Event('storage'));
 
@@ -162,7 +211,7 @@ export const TransporterDashboard: React.FC = () => {
     }, 1500);
   };
 
-  const handleVerifyQualityAndPickup = () => {
+  const handleVerifyQualityAndPickup = async () => {
     if (!activeDelivery) return;
 
     const updated: DeliveryRequest = {
@@ -177,6 +226,23 @@ export const TransporterDashboard: React.FC = () => {
       }
     };
 
+    try {
+      if (token) {
+        await fetch('/api/transport/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            requestId: activeDelivery.id,
+            cropPhotoUrl: inspectionPhoto,
+            verificationDetails: JSON.stringify({ isGradeA, isMoistureOK, isPackagingOK }),
+            status: 'QUALITY_VERIFIED'
+          })
+        });
+      }
+    } catch (e) {
+      console.warn('Backend quality verify transport request error:', e);
+    }
+
     setActiveDelivery(updated);
     setDeliveries(prev => prev.map(d => d.id === updated.id ? updated : d));
     localStorage.setItem('farmora_active_delivery', JSON.stringify(updated));
@@ -186,13 +252,28 @@ export const TransporterDashboard: React.FC = () => {
     setTimeout(() => setToastMsg(''), 3000);
   };
 
-  const handleUpdateStatus = (newStatus: 'IN_TRANSIT' | 'DELIVERED') => {
+  const handleUpdateStatus = async (newStatus: 'IN_TRANSIT' | 'DELIVERED') => {
     if (!activeDelivery) return;
 
     const updated: DeliveryRequest = {
       ...activeDelivery,
       status: newStatus
     };
+
+    try {
+      if (token) {
+        await fetch('/api/transport/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            requestId: activeDelivery.id,
+            status: newStatus
+          })
+        });
+      }
+    } catch (e) {
+      console.warn('Backend update transport status error:', e);
+    }
 
     setActiveDelivery(updated);
     setDeliveries(prev => prev.map(d => d.id === updated.id ? updated : d));

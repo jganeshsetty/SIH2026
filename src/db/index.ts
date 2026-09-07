@@ -1,7 +1,6 @@
-// src/db/index.ts
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
-import * as schema from './schema';
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import * as schema from "./schema";
 
 const { Pool } = pg;
 
@@ -9,17 +8,22 @@ declare global {
   var _postgresPool: pg.Pool | undefined;
 }
 
+/**
+ * Creates or retrieves the singleton PostgreSQL connection pool.
+ * Configures SSL requirements dynamically based on connection string or deployment environment.
+ */
 export const createPool = () => {
   if (!global._postgresPool) {
     const connectionString = process.env.DATABASE_URL;
-    
+
     if (connectionString) {
-      const needsSsl = process.env.NODE_ENV === 'production' || 
-                       process.env.VERCEL === '1' ||
-                       connectionString.includes('sslmode=require') || 
-                       connectionString.includes('neon.tech') || 
-                       connectionString.includes('supabase') ||
-                       connectionString.includes('render.com');
+      const needsSsl =
+        process.env.NODE_ENV === "production" ||
+        process.env.VERCEL === "1" ||
+        connectionString.includes("sslmode=require") ||
+        connectionString.includes("neon.tech") ||
+        connectionString.includes("supabase") ||
+        connectionString.includes("render.com");
 
       global._postgresPool = new Pool({
         connectionString,
@@ -29,22 +33,26 @@ export const createPool = () => {
       });
     } else {
       global._postgresPool = new Pool({
-        host: process.env.SQL_HOST || 'localhost',
-        user: process.env.SQL_USER || 'postgres',
-        password: process.env.SQL_PASSWORD || 'Ganesh@2008',
-        database: process.env.SQL_DB_NAME || 'farmora',
+        host: process.env.SQL_HOST || "localhost",
+        user: process.env.SQL_USER || "postgres",
+        password: process.env.SQL_PASSWORD || "Ganesh@2008",
+        database: process.env.SQL_DB_NAME || "farmora",
         port: process.env.SQL_PORT ? parseInt(process.env.SQL_PORT) : 5432,
         max: 10,
         connectionTimeoutMillis: 15000,
       });
     }
 
-    global._postgresPool.on('error', (err) => {
-      console.error('Unexpected error on idle SQL pool client:', err);
+    global._postgresPool.on("error", (err) => {
+      console.error("Unexpected error on idle SQL pool client:", err);
     });
   }
   return global._postgresPool;
 };
 
 const pool = createPool();
+
+/**
+ * Shared Drizzle ORM Database Instance with Schema Bindings.
+ */
 export const db = drizzle(pool, { schema });

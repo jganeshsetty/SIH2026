@@ -87,10 +87,13 @@ export const MultilingualVoiceBar: React.FC = () => {
   // Handle Assistant Speech Output and seamlessly return to listening
   const handleSpeakAiReply = useCallback((text: string, localeCode: string) => {
     if (isAudioMuted) {
-      // If audio is muted, return directly to listening if assistant was active
-      if (speechControllerRef.current && assistantStateRef.current !== 'PAUSED') {
-        speechControllerRef.current.resume();
-        setAssistantState('LISTENING');
+      if (speechControllerRef.current && assistantStateRef.current !== 'PAUSED' && assistantStateRef.current !== 'IDLE') {
+        setTimeout(() => {
+          speechControllerRef.current?.resume();
+          setAssistantState('LISTENING');
+        }, 300);
+      } else {
+        setAssistantState('IDLE');
       }
       return;
     }
@@ -101,22 +104,28 @@ export const MultilingualVoiceBar: React.FC = () => {
     }
     setAssistantState('SPEAKING');
 
-    speakText(
+    const success = speakText(
       text,
       localeCode,
       () => {
         setAssistantState('SPEAKING');
       },
       () => {
-        // When speech finishes, seamlessly resume listening
-        if (speechControllerRef.current && assistantStateRef.current !== 'PAUSED') {
-          speechControllerRef.current.resume();
-          setAssistantState('LISTENING');
-        } else {
-          setAssistantState('IDLE');
-        }
+        // When speech finishes, wait 300ms ambient buffer then seamlessly resume listening
+        setTimeout(() => {
+          if (speechControllerRef.current && assistantStateRef.current !== 'PAUSED' && assistantStateRef.current !== 'IDLE') {
+            speechControllerRef.current.resume();
+            setAssistantState('LISTENING');
+          } else {
+            setAssistantState('IDLE');
+          }
+        }, 300);
       }
     );
+
+    if (!success) {
+      setAssistantState('IDLE');
+    }
   }, [isAudioMuted]);
 
   // Process a user question or voice transcript
@@ -353,6 +362,7 @@ export const MultilingualVoiceBar: React.FC = () => {
       {!isOpen ? (
         <button
           type="button"
+          aria-label="Open AI Voice Assistant"
           onClick={() => {
             setIsOpen(true);
             // Automatically begin continuous listening upon opening if supported
@@ -361,23 +371,23 @@ export const MultilingualVoiceBar: React.FC = () => {
               setAssistantState('LISTENING');
             }
           }}
-          className="flex items-center gap-3 px-5 py-3.5 rounded-full bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-800 hover:from-emerald-900 hover:to-emerald-700 text-white shadow-2xl border-2 border-white/80 transition-all duration-200 hover:scale-105 cursor-pointer"
+          className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-emerald-900 hover:bg-emerald-800 text-white shadow-xl border-2 border-white/90 transition-all duration-200 hover:scale-105 cursor-pointer"
         >
           <div className="relative">
-            <div className={`p-2.5 rounded-full ${
-              assistantState === 'LISTENING' ? 'bg-rose-600 animate-pulse' : 'bg-emerald-600'
-            } text-white shadow-md flex items-center justify-center`}>
+            <div className={`p-2 rounded-full ${
+              assistantState === 'LISTENING' ? 'bg-rose-600 animate-pulse' : 'bg-emerald-700'
+            } text-white shadow-sm flex items-center justify-center`}>
               <Mic className="w-4 h-4 text-white" />
             </div>
             {assistantState === 'LISTENING' && (
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full animate-ping" />
             )}
           </div>
-          <div className="text-left leading-tight">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-200 block">
+          <div className="text-left leading-tight hidden sm:block">
+            <span className="text-xs font-bold text-emerald-200 block">
               {t('voice.triggerButton', 'AI Voice Assistant')}
             </span>
-            <span className="text-[11px] font-semibold text-white/90">
+            <span className="text-xs font-semibold text-white/90">
               {selectedLang.nativeName} • {getStateLabel()}
             </span>
           </div>

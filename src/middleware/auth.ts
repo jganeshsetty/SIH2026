@@ -1,8 +1,12 @@
+// ============================================================================
+// Farmora Authentication & Role Authorization Middleware
+// ============================================================================
+
 import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../lib/firebase-admin';
 import { db } from '../db/index';
 import { users } from '../db/schema';
-import { eq, or } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { verifyToken } from '../lib/auth-utils';
 
 export interface AuthRequest extends Request {
@@ -10,6 +14,9 @@ export interface AuthRequest extends Request {
   dbUser?: any;
 }
 
+/**
+ * Authentication Middleware: Verifies Bearer Token via Local JWT or Firebase Auth
+ */
 export const requireAuth = async (
   req: AuthRequest,
   res: Response,
@@ -22,12 +29,17 @@ export const requireAuth = async (
   }
 
   const token = authHeader.split('Bearer ')[1];
-  
-  // 1. Try local Farmora JWT verification first
+
+  // 1. Verify local Farmora JWT token
   const localUser = verifyToken(token);
   if (localUser) {
     try {
-      const dbUsers = await db.select().from(users).where(eq(users.uid, localUser.uid)).limit(1);
+      const dbUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.uid, localUser.uid))
+        .limit(1);
+
       if (dbUsers.length > 0) {
         req.dbUser = dbUsers[0];
         req.user = localUser;
@@ -39,16 +51,26 @@ export const requireAuth = async (
     }
   }
 
-  // 2. Try Firebase ID token verification
+  // 2. Verify Firebase Admin ID token
   try {
     const decodedToken = await adminAuth.verifyIdToken(token);
     req.user = decodedToken;
-    
+
     try {
-      let dbUsers = await db.select().from(users).where(eq(users.uid, decodedToken.uid)).limit(1);
+      let dbUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.uid, decodedToken.uid))
+        .limit(1);
+
       if (dbUsers.length === 0 && decodedToken.email) {
-        dbUsers = await db.select().from(users).where(eq(users.email, decodedToken.email.toLowerCase().trim())).limit(1);
+        dbUsers = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, decodedToken.email.toLowerCase().trim()))
+          .limit(1);
       }
+
       if (dbUsers.length > 0) {
         req.dbUser = dbUsers[0];
       }
@@ -59,7 +81,7 @@ export const requireAuth = async (
     next();
     return;
   } catch (error) {
-    // 3. Fallback: Parse unverified JWT payload for Firebase tokens if adminAuth keys fail
+    // 3. Fallback: Parse JWT payload if Firebase Admin verification is unconfigured
     try {
       const parts = token.split('.');
       if (parts.length === 3) {
@@ -70,10 +92,20 @@ export const requireAuth = async (
           req.user = { uid, email, name: payload.name || email.split('@')[0] || 'Farmora User' };
 
           try {
-            let dbUsers = await db.select().from(users).where(eq(users.uid, uid)).limit(1);
+            let dbUsers = await db
+              .select()
+              .from(users)
+              .where(eq(users.uid, uid))
+              .limit(1);
+
             if (dbUsers.length === 0 && email) {
-              dbUsers = await db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1);
+              dbUsers = await db
+                .select()
+                .from(users)
+                .where(eq(users.email, email.toLowerCase().trim()))
+                .limit(1);
             }
+
             if (dbUsers.length > 0) {
               req.dbUser = dbUsers[0];
             }
@@ -90,6 +122,9 @@ export const requireAuth = async (
   }
 };
 
+/**
+ * Role-Based Authorization Middleware (Farmer, Buyer, Transporter)
+ */
 export const requireRole = (allowedRoles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.dbUser) {
@@ -98,7 +133,7 @@ export const requireRole = (allowedRoles: string[]) => {
     }
 
     const normalizedRole = (req.dbUser.role || '').toLowerCase();
-    const normalizedAllowed = allowedRoles.map(r => r.toLowerCase());
+    const normalizedAllowed = allowedRoles.map(role => role.toLowerCase());
 
     const isAllowed = normalizedAllowed.includes(normalizedRole) ||
                       (normalizedAllowed.includes('transporter') && ['transport_driver', 'driver'].includes(normalizedRole)) ||

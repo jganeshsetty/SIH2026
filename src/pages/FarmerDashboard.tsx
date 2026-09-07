@@ -74,7 +74,7 @@ interface DeliveryOrder {
 
 export const FarmerDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, appUser, logout } = useAuth();
+  const { user, appUser, token, logout } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<
     'add-crop' | 'advisor' | 'buyers' | 'storage' | 'fpo' | 'demands' | 'map' | 'delivery'
@@ -233,11 +233,39 @@ export const FarmerDashboard: React.FC = () => {
       localStorage.setItem('farmora_offers', JSON.stringify(updatedOffers));
       
       if (newStatus === 'ACCEPTED') {
+        const targetOffer = offers.find(o => o.id === offerId);
         const savedOrders = JSON.parse(localStorage.getItem('farmora_buyer_orders') || '[]');
         const updatedOrders = savedOrders.map((order: any) => 
           order.id === offerId ? { ...order, status: 'IN_TRANSIT' } : order
         );
         localStorage.setItem('farmora_buyer_orders', JSON.stringify(updatedOrders));
+
+        const newDeliveryRequest = {
+          id: Date.now(),
+          cropName: targetOffer?.cropName || crops[0]?.name || 'Tomato',
+          quantity: targetOffer?.offeredQuantity || 5000,
+          unit: 'kg',
+          farmerName: appUser?.name || 'Ganesh (Farmer)',
+          farmerLocation: crops[0]?.location || 'Central Agro Zone, Nashik, Maharashtra',
+          buyerName: targetOffer?.buyerName || 'Reliance Wholesale Agro Depot',
+          buyerLocation: 'Mumbai Central Wholesale Depot, Maharashtra',
+          pathType: 'Farmer → Buyer' as const,
+          distanceKm: 165,
+          farePayout: 18500,
+          status: 'AVAILABLE' as const,
+          isAccepted: false
+        };
+
+        const existingRequests = JSON.parse(localStorage.getItem('farmora_delivery_requests') || '[]');
+        localStorage.setItem('farmora_delivery_requests', JSON.stringify([newDeliveryRequest, ...existingRequests]));
+
+        if (token) {
+          fetch('/api/transport/requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(newDeliveryRequest)
+          }).catch(() => {});
+        }
       }
       window.dispatchEvent(new Event('storage'));
     } catch (e) {}

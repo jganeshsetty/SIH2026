@@ -1,32 +1,36 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
+/**
+ * Farmora Add Crop Form Component
+ * Form allowing registered farmers to submit new harvest crop listings.
+ */
 export function AddCropForm({ onComplete }: { onComplete: () => void }) {
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState("");
   const [formData, setFormData] = useState({
-    name: '',
-    variety: '',
-    quantity: '',
-    unit: 'kg',
-    expectedPrice: '',
-    minPrice: '',
-    quality: '',
-    harvestDate: '',
-    pickupLocation: '',
-    description: '',
-    deliveryAvailable: false
+    name: "",
+    variety: "",
+    quantity: "",
+    unit: "kg",
+    expectedPrice: "",
+    minPrice: "",
+    quality: "",
+    harvestDate: "",
+    pickupLocation: "",
+    description: "",
+    deliveryAvailable: false,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
   };
 
@@ -34,31 +38,31 @@ export function AddCropForm({ onComplete }: { onComplete: () => void }) {
     e.preventDefault();
     if (!token) return;
     setLoading(true);
-    setErrorMsg('');
+    setErrorMsg("");
     try {
-      const res = await fetch('/api/crops', {
-        method: 'POST',
+      const res = await fetch("/api/crops", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           ...formData,
           quantity: parseFloat(formData.quantity),
           expectedPrice: parseFloat(formData.expectedPrice),
           minPrice: parseFloat(formData.minPrice),
-          harvestDate: new Date(formData.harvestDate).toISOString()
-        })
+          harvestDate: new Date(formData.harvestDate).toISOString(),
+        }),
       });
       if (res.ok) {
         onComplete();
       } else {
         const errorData = await res.json().catch(() => ({}));
-        setErrorMsg(errorData.error || 'Failed to list crop');
+        setErrorMsg(errorData.error || "Failed to list crop");
       }
     } catch (error: any) {
       console.error(error);
-      setErrorMsg(error.message || 'Network error');
+      setErrorMsg(error.message || "Network error");
     } finally {
       setLoading(false);
     }
@@ -79,12 +83,21 @@ export function AddCropForm({ onComplete }: { onComplete: () => void }) {
         <div className="space-y-2">
           <Label htmlFor="quantity">Quantity</Label>
           <div className="flex gap-2">
-             <Input id="quantity" name="quantity" type="number" required value={formData.quantity} onChange={handleChange} placeholder="0" className="flex-1" />
-             <select name="unit" value={formData.unit} onChange={handleChange} className="border rounded-md px-3 bg-transparent">
-               <option value="kg">kg</option>
-               <option value="ton">ton</option>
-               <option value="quintal">quintal</option>
-             </select>
+            <Input
+              id="quantity"
+              name="quantity"
+              type="number"
+              required
+              value={formData.quantity}
+              onChange={handleChange}
+              placeholder="0"
+              className="flex-1"
+            />
+            <select name="unit" value={formData.unit} onChange={handleChange} className="border rounded-md px-3 bg-transparent">
+              <option value="kg">kg</option>
+              <option value="ton">ton</option>
+              <option value="quintal">quintal</option>
+            </select>
           </div>
         </div>
         <div className="space-y-2">
@@ -110,25 +123,28 @@ export function AddCropForm({ onComplete }: { onComplete: () => void }) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="description">Description (Optional)</Label>
-        <textarea 
-          id="description" 
-          name="description" 
-          value={formData.description} 
+        <textarea
+          id="description"
+          name="description"
+          value={formData.description}
           onChange={handleChange}
           className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
       <div className="flex items-center space-x-2">
-        <input type="checkbox" id="deliveryAvailable" name="deliveryAvailable" checked={formData.deliveryAvailable} onChange={handleChange} className="rounded border-farmora-border text-farmora-primary focus:ring-farmora-primary" />
+        <input
+          type="checkbox"
+          id="deliveryAvailable"
+          name="deliveryAvailable"
+          checked={formData.deliveryAvailable}
+          onChange={handleChange}
+          className="rounded border-farmora-border text-farmora-primary focus:ring-farmora-primary"
+        />
         <Label htmlFor="deliveryAvailable">I can arrange delivery</Label>
       </div>
-      {errorMsg && (
-        <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium">
-          {errorMsg}
-        </div>
-      )}
+      {errorMsg && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium">{errorMsg}</div>}
       <Button type="submit" disabled={loading} className="w-full rounded-xl">
-        {loading ? 'Listing...' : 'List Crop'}
+        {loading ? "Listing..." : "List Crop"}
       </Button>
     </form>
   );
