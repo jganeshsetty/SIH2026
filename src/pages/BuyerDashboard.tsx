@@ -178,6 +178,40 @@ export const BuyerDashboard: React.FC = () => {
   });
 
   useEffect(() => {
+    // 1. Fetch live farmer crops directly from PostgreSQL
+    const fetchCropsFromBackend = async () => {
+      try {
+        const res = await fetch('/api/crops');
+        if (res.ok) {
+          const backendCrops = await res.json();
+          if (Array.isArray(backendCrops) && backendCrops.length > 0) {
+            const mappedCrops: AvailableCrop[] = backendCrops.map((c: any) => ({
+              id: c.id,
+              farmerId: c.farmerId || 1,
+              farmerName: c.farmerName || 'Verified Regional Farmer',
+              farmerLocation: c.pickupLocation || c.location || 'Nashik, Maharashtra',
+              name: c.name || 'Crop Produce',
+              quantity: c.quantity || 1000,
+              unit: c.unit || 'kg',
+              pricePerUnit: c.expectedPrice || c.pricePerUnit || 30,
+              harvestDate: c.harvestDate ? new Date(c.harvestDate).toISOString().split('T')[0] : '2026-09-15',
+              description: c.description || 'Fresh field-harvested produce ready for procurement.',
+              imageUrl: c.imageUrl || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80',
+              quality: c.quality || 'Grade A Fresh'
+            }));
+            setCrops(prev => {
+              const ids = new Set(mappedCrops.map(m => m.id));
+              const nonDuplicatePrev = prev.filter(p => !ids.has(p.id));
+              return [...mappedCrops, ...nonDuplicatePrev];
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Backend crops fetch error:', err);
+      }
+    };
+    fetchCropsFromBackend();
+
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'farmora_crops') {
         try {
@@ -212,6 +246,7 @@ export const BuyerDashboard: React.FC = () => {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
 
   const [selectedCrop, setSelectedCrop] = useState<AvailableCrop | null>(null);
   const [paymentStep, setPaymentStep] = useState<'review' | 'escrow' | 'success'>('review');

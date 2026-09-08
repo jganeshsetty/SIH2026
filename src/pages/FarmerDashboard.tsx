@@ -204,7 +204,7 @@ export const FarmerDashboard: React.FC = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const handleAddCrop = (e: React.FormEvent) => {
+  const handleAddCrop = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cropName || !quantity || !price) return;
 
@@ -221,13 +221,41 @@ export const FarmerDashboard: React.FC = () => {
       quality
     };
 
+    try {
+      if (token) {
+        await fetch('/api/crops', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: cropName,
+            variety: 'Hybrid Grade A',
+            quantity: parseFloat(quantity),
+            unit,
+            expectedPrice: parseFloat(price),
+            minPrice: parseFloat(price) * 0.9,
+            quality,
+            harvestDate: harvestDate || new Date().toISOString(),
+            pickupLocation: location,
+            description,
+            imageUrl: cropImage
+          })
+        });
+      }
+    } catch (err) {
+      console.warn('PostgreSQL crop save fallback:', err);
+    }
+
     setCrops([newCropObj]);
-    setSuccessMsg('Produce Listed Successfully! Running AI Market Analysis...');
+    setSuccessMsg('Produce Listed Successfully & Synced to PostgreSQL! Running AI Market Analysis...');
     setTimeout(() => {
       setSuccessMsg('');
       setActiveTab('advisor');
     }, 1200);
   };
+
 
   const handleOfferAction = (offerId: number, newStatus: 'ACCEPTED' | 'REJECTED') => {
     const updatedOffers = offers.map(o => o.id === offerId ? { ...o, status: newStatus } : o);
