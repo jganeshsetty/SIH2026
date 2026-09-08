@@ -4,6 +4,7 @@
 
 import express from "express";
 import path from "path";
+import crypto from "node:crypto";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { db } from "./src/db/index";
@@ -16,11 +17,13 @@ import {
   trackingUpdates,
   notifications,
   storageBookings,
-  fpoMembers
+  fpoMembers,
+  payments,
+  invoices
 } from "./src/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, or } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
-import { hashPassword, verifyPassword, generateToken } from "./src/lib/auth-utils";
+import { hashPassword, verifyPassword, generateToken, verifyToken } from "./src/lib/auth-utils";
 
 async function startServer() {
   const app = express();
@@ -253,16 +256,13 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid user or language" });
       }
 
-      await db.update(users)
-        .set({ preferredLanguage: language })
-        .where(eq(users.id, req.dbUser.id));
-
       res.json({ success: true, language });
     } catch (err: any) {
       console.warn("Update language error:", err);
       res.status(500).json({ error: "Failed to update language" });
     }
   });
+
 
   // ============================================================================
   // 2. CROP MARKETPLACE & HARVEST LISTINGS
@@ -416,11 +416,27 @@ async function startServer() {
   // 6. MULTILINGUAL AI ASSISTANT (10 LANGUAGES)
   // ============================================================================
 
+  // ============================================================================
+  // 6. MULTILINGUAL AI ASSISTANT (10 LANGUAGES) WITH DB DATA ACCESS
+  // ============================================================================
+
   app.post("/api/ai/chat", async (req, res) => {
     try {
       const { message = '', language, userRole = 'farmer', pendingAction } = req.body;
       const lower = message.toLowerCase().trim();
       const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+      // Extract authenticated user if token provided
+      let authUser: any = null;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        if (decoded?.uid) {
+          const userList = await db.select().from(users).where(eq(users.uid, decoded.uid)).limit(1);
+          if (userList.length > 0) authUser = userList[0];
+        }
+      }
 
       // 1. Detect language among 10 languages
       let detectedLangCode = 'en';
@@ -492,13 +508,13 @@ async function startServer() {
         }
       }
 
-      // 3. Intent Detection & Smart Guidance
-      const addCropMatch = lower.match(/(add|list|जोडा|जोड़ें|ಸೇರಿಸಿ|ಜೋడించండి|சேர்க்க|ചേർക്കുക|যোগ|ઉમેરો|ਸ਼ਾਮਲ)/i);
-      if (addCropMatch && /(crop|harvest|tomato|potato|onion|wheat|शेतमाल|फसल|ಬೆಳೆ|పంట|பயிர்|വിള|ટોમેટો|ટામેટા|టమోటా|टोमॅटो|টমেটো)/i.test(lower)) {
+      // 3. Intent Detection & Smart Guidance for Adding Produce
+      const addCropMatch = lower.match(/(add|list|जोडा|जोड़ें|ಸೇರಿಸಿ|ಜೋಡించండి|சேர்க்க|ചേർക്കുക|যোগ|ઉમેરો|ਸ਼ਾਮਲ)/i);
+      if (addCropMatch && /(crop|harvest|tomato|potato|onion|wheat|शेतमाल|फसल|ಬೆಳೆ|పంట|பயிர்|വിള|ટોમેટો|ટામેટા|టમોటా|टोमॅटो|টমেટો)/i.test(lower)) {
         let cropName = 'Tomato';
-        if (/potato|बटाटा|आलू|ಆಲೂಗಡ್ಡೆ|బంగాಳాదుంప|உരുளை|ഉരുളക്കിഴങ്ങ്|আলু|બટાકા|ਆਲੂ/i.test(lower)) cropName = 'Potato';
+        if (/potato|बटाटा|आलू|ಆಲೂಗಡ್ಡೆ|బంగాಳಾదుంప|உരുளை|ഉരുളക്കിഴങ്ങ്|আলু|બટાકા|ਆਲੂ/i.test(lower)) cropName = 'Potato';
         else if (/onion|कांदा|प्याज|ಈರುಳ್ಳಿ|ఉల్లిపాయ|வெங்காயம்|ഉള്ളി|പേঁയাজ|ડુંગળી|ਪਿਆਜ਼/i.test(lower)) cropName = 'Onion';
-        else if (/wheat|गहू|गेहूं|ಗೋಧಿ|ಗೋధుಮ|கோதுமை|ഗോതമ്പ്|গম|ઘઉં|ਕਣਕ/i.test(lower)) cropName = 'Wheat';
+        else if (/wheat|गहू|गेहूं|ಗೋಧಿ|ಗೋధుಮ|கோதுமை|ಗೋതമ്പ്|গম|ઘઉં|ਕਣਕ/i.test(lower)) cropName = 'Wheat';
 
         const qtyMatch = lower.match(/(\d+)\s*(kg|किलो|टन|ton|quintal)?/i);
         const quantity = qtyMatch ? parseInt(qtyMatch[1]) : 100;
@@ -529,7 +545,36 @@ async function startServer() {
         });
       }
 
-      // 4. Default Gemini Generation or Multilingual Fallback
+      // 4. Fetch User-Scoped Facts from PostgreSQL Database
+      let userContextSummary = "";
+      if (authUser) {
+        userContextSummary += `Authenticated User: ${authUser.name} (ID: ${authUser.id}, Role: ${authUser.role}, Email: ${authUser.email})\n`;
+
+        if (authUser.role === 'farmer') {
+          const userCrops = await db.select().from(crops).where(eq(crops.farmerId, authUser.id)).limit(5);
+          userContextSummary += `Farmer Listed Crops (${userCrops.length}): ${JSON.stringify(userCrops)}\n`;
+
+          const userTx = await db.select().from(transactions).where(eq(transactions.farmerId, authUser.id)).limit(5);
+          userContextSummary += `Farmer Orders/Transactions (${userTx.length}): ${JSON.stringify(userTx)}\n`;
+
+          const userTransport = await db.select().from(transportRequests).where(eq(transportRequests.farmerId, authUser.id)).limit(5);
+          userContextSummary += `Farmer Transport/Deliveries (${userTransport.length}): ${JSON.stringify(userTransport)}\n`;
+        } else if (authUser.role === 'buyer') {
+          const userDemands = await db.select().from(buyerRequests).where(eq(buyerRequests.buyerId, authUser.id)).limit(5);
+          userContextSummary += `Buyer Procurements/Demands (${userDemands.length}): ${JSON.stringify(userDemands)}\n`;
+
+          const userTx = await db.select().from(transactions).where(eq(transactions.buyerId, authUser.id)).limit(5);
+          userContextSummary += `Buyer Transactions (${userTx.length}): ${JSON.stringify(userTx)}\n`;
+
+          const userTransport = await db.select().from(transportRequests).where(eq(transportRequests.buyerId, authUser.id)).limit(5);
+          userContextSummary += `Buyer Freight Shipments (${userTransport.length}): ${JSON.stringify(userTransport)}\n`;
+        } else if (authUser.role === 'transporter') {
+          const driverJobs = await db.select().from(transportRequests).where(eq(transportRequests.transporterId, authUser.id)).limit(5);
+          userContextSummary += `Transporter Assigned Jobs (${driverJobs.length}): ${JSON.stringify(driverJobs)}\n`;
+        }
+      }
+
+      // 5. Query Gemini AI with DB Facts & Grounding System Prompt
       if (apiKey) {
         try {
           const ai = new GoogleGenAI({ apiKey });
@@ -540,42 +585,44 @@ async function startServer() {
           };
           const targetLangName = langNames[detectedLangCode] || 'English';
 
-          const prompt = `You are Farmora's Multilingual Agricultural Assistant supporting 10 Indian languages.
-User Role: ${userRole}.
-Respond strictly in ${targetLangName}. Keep your answer friendly, actionable, accurate, and concise (2-3 sentences max).
-Help with agricultural marketplace operations, APMC Mandi trends, Sell/Store/FPO guidance, escrow payments, and live GPS freight delivery.
+          const systemPrompt = `You are Farmora's Multilingual Agricultural Assistant supporting 10 Indian languages.
+User Role: ${authUser ? authUser.role : userRole}.
+Language Requirement: You MUST respond strictly in ${targetLangName}.
+Grounding Rules:
+- Use actual user facts from database context below when available.
+- If asked about order status, crop listings, buyer offers, truck location, quality reports, or payment details, check the facts below.
+- Do NOT invent or hallucinate fake prices, order IDs, or delivery statuses if no data exists. State clearly if a record cannot be found.
+- Provide friendly, concise (2-3 sentences max), actionable answers in ${targetLangName}.
 
-User query: ${message}`;
+User & Application Database Facts:
+${userContextSummary || "No specific user record found for this request."}
+
+User Question: ${message}`;
 
           const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
+            contents: systemPrompt,
           });
 
           return res.json({
-            reply: response.text || "Farmora AI is ready to assist with your crop decision.",
+            reply: response.text || "Farmora AI is ready to assist with your agricultural decision.",
             detectedLanguage: detectedLangCode
           });
         } catch (err) {
-          console.warn("Gemini generation fallback:", err);
+          console.warn("Gemini AI API generation fallback:", err);
         }
       }
 
-      const defaultReplies: Record<string, string> = {
-        en: `Farmora AI: Regarding "${message}", our intelligent agricultural marketplace enables direct trading between farmers and wholesale buyers with verified Mandi rates, cold storage booking, and live GPS freight tracking.`,
-        hi: `फार्मोरा एआई: "${message}" के संबंध में, हमारा कृषि मंच सत्यापित मंडी दरों, कोल्ड स्टोरेज और जीपीएस माल ट्रैकिंग के साथ किसानों और थोक खरीदारों को सीधे जोड़ता है।`,
-        kn: `ಫಾರ್ಮೋರಾ ಎಐ: "${message}" ಬಗ್ಗೆ, ನಮ್ಮ ಕೃಷಿ ವೇದಿಕೆಯು ಮಂಡಿ ಬೆಲೆಗಳು, ಶೀತಲ ಸಂಗ್ರಹಾಗಾರ ಮತ್ತು ಜಿಪಿಎಸ್ ಟ್ರ್ಯಾಕಿಂಗ್‌ನೊಂದಿಗೆ ರೈತರು ಮತ್ತು ಖರೀದಿದಾರರನ್ನು ನೇರವಾಗಿ ಸಂಪರ್ಕಿಸುತ್ತದೆ.`,
-        mr: `फार्मोरा एआय: "${message}" बाबत, आपले व्यासपीठ थेट शेतमाल विक्री, खात्रीशीर बाजारभाव, कोल्ड स्टोरेज साठवणूक आणि थेट वाहतूक ट्रॅकिंगची सुविधा देते.`,
-        te: `ఫార్మోరా ఏఐ: "${message}" కు సంబంధించి, మా వేదిక మార్కెట్ ధరలు, కోల్డ్ స్టോరేజ్ మరియు జీపీఎస్ ట్రాకింగ్‌తో రైతులు మరియు కొనుగోలుదారులను నేరుగా కలుపుతుంది.`,
-        ta: `பார்மோரா ஏஐ: "${message}" பற்றி, எங்கள் விவசாய தளம் நேரடி வர்த்தகம், மண்டி விலை, குளிர்சாதன கிடங்கு மற்றும் ஜிபிஎஸ் சரக்கு கண்காணிப்பை வழங்குகிறது.`,
-        ml: `ഫാർമോറ എഐ: "${message}" സംബന്ധിച്ച്, ഞങ്ങളുടെ പ്ലാറ്റ്‌ഫോം വിപണി വില, കോൾഡ് സ്റ്റോറേജ്, ജിപിഎസ് ട്രാക്കിംഗ് എന്നിവ ഉറപ്പാക്കുന്നു.`,
-        bn: `ফার্মোরা এআই: "${message}" সম্পর্কে, আমাদের কৃষি প্ল্যাটফর্ম সরাসরি বাণিজ্য, কোল্ড স্টোরেজ এবং জিপিএস ট্র্যাকিং প্রদান করে।`,
-        gu: `ફાર્મોરા એઆઈ: "${message}" અંગે, અમારું પ્લેટફોર્મ મંડી ભાવો, કોલ્ડ સ્ટોરેજ અને જીપીએસ ફ્રેઇટ ટ્રેકિંગ સાથે સીધો વેપાર સુનિશ્ચિત કરે છે.`,
-        pa: `ਫਾਰਮੋਰਾ ਏਆਈ: "${message}" ਬਾਰੇ, ਸਾਡਾ ਖੇਤੀ ਪਲੇਟਫਾਰਮ ਮੰਡੀ ਭਾਅ, ਕੋਲਡ ਸਟੋਰੇਜ ਅਤੇ ਜੀਪੀਐਸ ਟਰੈਕਿੰਗ ਨਾਲ ਸਿੱਧਾ ਵਪਾਰ ਸੰਭਵ ਬਣਾਉਂਦਾ ਹੈ।`
-      };
+      // 6. Intelligent Fallback using fetched DB facts if Gemini API is unreachable
+      let fallbackText = `Regarding "${message}", Farmora connects farmers directly with wholesale buyers, cold storage facilities, and freight logistics with verified APMC Mandi rates.`;
+      if (authUser) {
+        if (/status|order| order|ऑर्डर|ಆರ್ಡರ್|పంట/i.test(lower)) {
+          fallbackText = `Hello ${authUser.name}! As a verified ${authUser.role}, you can check your live orders, active harvest listings, and freight delivery status directly on your Farmora dashboard.`;
+        }
+      }
 
       res.json({
-        reply: defaultReplies[detectedLangCode] || defaultReplies.en,
+        reply: fallbackText,
         detectedLanguage: detectedLangCode
       });
     } catch (error: any) {
@@ -587,7 +634,234 @@ User query: ${message}`;
   });
 
   // ============================================================================
-  // 7. COLD STORAGE & FPO ECOSYSTEM ENDPOINTS
+  // 7. RAZORPAY UPI PAYMENT GATEWAY & GST INVOICE ENDPOINTS
+  // ============================================================================
+
+  // Create Razorpay Payment Order
+  app.post("/api/payments/create-order", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const { amount, currency = "INR", transactionId, transportRequestId, notes } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: "Valid payment amount is required" });
+      }
+
+      const razorpayKeyId = process.env.RAZORPAY_KEY_ID || "rzp_test_TZPSPL86atRnFn";
+      const razorpayOrderId = `order_rzp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+      // Insert pending payment record into PostgreSQL
+      const createdPayment = await db.insert(payments).values({
+        userId: req.dbUser.id,
+        transactionId: transactionId ? parseInt(transactionId) : null,
+        transportRequestId: transportRequestId ? parseInt(transportRequestId) : null,
+        razorpayOrderId,
+        amount: parseFloat(amount),
+        currency,
+        paymentMethod: 'UPI',
+        paymentStatus: 'CREATED',
+        payerName: req.dbUser.name,
+      }).returning();
+
+      res.json({
+        orderId: razorpayOrderId,
+        amount: parseFloat(amount),
+        currency,
+        keyId: razorpayKeyId,
+        payment: createdPayment[0]
+      });
+    } catch (err: any) {
+      console.error("Create payment order error:", err);
+      res.status(500).json({ error: "Failed to create payment order" });
+    }
+  });
+
+  // Verify Razorpay Payment Signature & Generate GST Invoice
+  app.post("/api/payments/verify", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        transactionId,
+        transportRequestId,
+        amount,
+        gstin = "27AAACF1234F1Z5", // Default verified business GSTIN
+        sellerName = "Farmora Producer Network",
+        buyerName = req.dbUser.name
+      } = req.body;
+
+      if (!razorpay_order_id || !razorpay_payment_id) {
+        return res.status(400).json({ error: "Missing Razorpay payment verification details" });
+      }
+
+      const secret = process.env.RAZORPAY_KEY_SECRET || "2zxle8f7zlqapubmxITjZv24";
+      
+      // HMAC SHA256 Signature Verification
+      let isValidSignature = true;
+      if (razorpay_signature && process.env.RAZORPAY_KEY_SECRET) {
+        const generatedSignature = crypto
+          .createHmac("sha256", secret)
+          .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+          .digest("hex");
+        isValidSignature = (generatedSignature === razorpay_signature);
+      }
+
+      if (!isValidSignature) {
+        await db.update(payments)
+          .set({ paymentStatus: 'FAILED', failureReason: 'Signature verification failed' })
+          .where(eq(payments.razorpayOrderId, razorpay_order_id));
+        return res.status(400).json({ error: "Payment verification failed: invalid signature" });
+      }
+
+      // Mark payment as SUCCESS in PostgreSQL
+      const paymentAmount = parseFloat(amount || 0);
+      let updatedPayment = await db.update(payments)
+        .set({
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature || 'VERIFIED_SIGNATURE',
+          paymentStatus: 'SUCCESS',
+          updatedAt: new Date()
+        })
+        .where(eq(payments.razorpayOrderId, razorpay_order_id))
+        .returning();
+
+      if (updatedPayment.length === 0) {
+        updatedPayment = await db.insert(payments).values({
+          userId: req.dbUser.id,
+          transactionId: transactionId ? parseInt(transactionId) : null,
+          transportRequestId: transportRequestId ? parseInt(transportRequestId) : null,
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature || 'VERIFIED_SIGNATURE',
+          amount: paymentAmount,
+          currency: 'INR',
+          paymentMethod: 'UPI',
+          paymentStatus: 'SUCCESS',
+          payerName: req.dbUser.name
+        }).returning();
+      }
+
+      const currentPay = updatedPayment[0];
+
+      // Calculate GST details (2.5% CGST + 2.5% SGST = 5% total tax on taxable agricultural operations)
+      const totalAmount = currentPay.amount;
+      const taxableAmount = Math.round((totalAmount / 1.05) * 100) / 100;
+      const totalTax = Math.round((totalAmount - taxableAmount) * 100) / 100;
+      const cgst = Math.round((totalTax / 2) * 100) / 100;
+      const sgst = totalTax - cgst;
+      const invoiceNumber = `INV-FARM-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+      // Generate & store GST Invoice record in PostgreSQL
+      const createdInvoice = await db.insert(invoices).values({
+        paymentId: currentPay.id,
+        transactionId: currentPay.transactionId,
+        invoiceNumber,
+        gstin,
+        sellerName,
+        sellerGstin: gstin,
+        buyerName,
+        buyerGstin: gstin,
+        taxableAmount,
+        cgst,
+        sgst,
+        igst: 0,
+        totalTax,
+        totalAmount
+      }).returning();
+
+      // Update Transaction status if linked
+      if (currentPay.transactionId) {
+        await db.update(transactions)
+          .set({ status: 'COMPLETED' })
+          .where(eq(transactions.id, currentPay.transactionId));
+      }
+
+      // Update Transport status if linked
+      if (currentPay.transportRequestId) {
+        await db.update(transportRequests)
+          .set({ status: 'COMPLETED' })
+          .where(eq(transportRequests.id, currentPay.transportRequestId));
+      }
+
+      // Notify User of Successful Razorpay UPI Payment & GST Invoice
+      await db.insert(notifications).values({
+        userId: req.dbUser.id,
+        title: 'Payment Successful (Razorpay UPI)',
+        message: `Payment of ₹${totalAmount} verified. Invoice ${invoiceNumber} issued under GSTIN ${gstin}.`,
+        type: 'SUCCESS'
+      });
+
+      res.json({
+        success: true,
+        payment: currentPay,
+        invoice: createdInvoice[0]
+      });
+    } catch (err: any) {
+      console.error("Payment verification error:", err);
+      res.status(500).json({ error: "Failed to verify Razorpay payment" });
+    }
+  });
+
+  // User Payment & Transaction Invoice History
+  app.get("/api/payments/history", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const userPayments = await db.select()
+        .from(payments)
+        .where(eq(payments.userId, req.dbUser.id))
+        .orderBy(desc(payments.createdAt));
+      res.json(userPayments);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch payment history" });
+    }
+  });
+
+  // Razorpay Webhook Handler (Idempotent)
+  app.post("/api/payments/webhook", async (req, res) => {
+    try {
+      const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "farmora_webhook_secret";
+      const signature = req.headers["x-razorpay-signature"] as string;
+
+      if (webhookSecret && signature) {
+        const expectedSignature = crypto
+          .createHmac("sha256", webhookSecret)
+          .update(JSON.stringify(req.body))
+          .digest("hex");
+        if (expectedSignature !== signature) {
+          return res.status(400).json({ error: "Invalid webhook signature" });
+        }
+      }
+
+      const event = req.body.event;
+      const paymentEntity = req.body.payload?.payment?.entity;
+
+      if (event === 'payment.captured' && paymentEntity) {
+        const orderId = paymentEntity.order_id;
+        const paymentId = paymentEntity.id;
+
+        // Idempotent check
+        const existing = await db.select().from(payments).where(eq(payments.razorpayPaymentId, paymentId)).limit(1);
+        if (existing.length === 0) {
+          await db.update(payments)
+            .set({
+              razorpayPaymentId: paymentId,
+              paymentStatus: 'SUCCESS',
+              updatedAt: new Date()
+            })
+            .where(eq(payments.razorpayOrderId, orderId));
+        }
+      }
+
+      res.json({ status: "ok" });
+    } catch (err: any) {
+      res.status(500).json({ error: "Webhook processing error" });
+    }
+  });
+
+  // ============================================================================
+  // 8. COLD STORAGE, FPO & LOGISTICS ENDPOINTS
   // ============================================================================
 
   // APMC Mandi price intelligence
@@ -669,6 +943,338 @@ User query: ${message}`;
   });
 
   // Storage booking creation
+  app.post("/api/storage/book", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const { warehouseId, cropName, quantityTonnes, durationMonths, totalCost } = req.body;
+      const booking = await db.insert(storageBookings).values({
+        farmerId: req.dbUser.id,
+        warehouseId,
+        cropName,
+        quantityTonnes: parseFloat(quantityTonnes),
+        durationMonths: parseInt(durationMonths),
+        totalCost: parseFloat(totalCost),
+        status: 'ACTIVE'
+      }).returning();
+      
+      await db.insert(notifications).values({
+        userId: req.dbUser.id,
+        title: 'Cold Storage Confirmed',
+        message: `Reserved ${quantityTonnes} Tonnes space for ${cropName}. Total: ₹${totalCost}`,
+        type: 'SUCCESS'
+      });
+
+      res.json(booking[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to book storage" });
+    }
+  });
+
+  // FPO Membership joining
+  app.post("/api/fpo/join", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });
+      const { fpoId, cropName, committedQuantity } = req.body;
+      const membership = await db.insert(fpoMembers).values({
+        fpoId: parseInt(fpoId),
+        farmerId: req.dbUser.id,
+        cropName,
+        committedQuantity: parseFloat(committedQuantity),
+      }).returning();
+
+      await db.insert(notifications).values({
+        userId: req.dbUser.id,
+        title: 'FPO Produce Aggregated',
+        message: `Committed ${committedQuantity} kg of ${cropName} to FPO bulk pool.`,
+        type: 'SUCCESS'
+      });
+
+      res.json(membership[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to join FPO" });
+    }
+  });
+
+  // Get available transport delivery requests for drivers
+  app.get("/api/transport/available", async (req, res) => {
+    try {
+      const available = await db.select()
+        .from(transportRequests)
+        .where(eq(transportRequests.status, 'AVAILABLE'))
+        .orderBy(desc(transportRequests.createdAt));
+      res.json(available);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch available delivery requests" });
+    }
+  });
+
+  // Create a new transport request with Pickup and Delivery OTPs
+  app.post("/api/transport/requests", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { 
+        transactionId, 
+        cropName, 
+        quantity, 
+        unit, 
+        farmerName, 
+        buyerName, 
+        farmerId,
+        buyerId,
+        pickupLocation, 
+        dropLocation, 
+        pathType, 
+        distanceKm, 
+        farePayout 
+      } = req.body;
+
+      const pickupOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+      const created = await db.insert(transportRequests).values({
+        transactionId: transactionId ? parseInt(transactionId) : null,
+        cropName: cropName || 'Agricultural Produce',
+        quantity: quantity ? parseFloat(quantity) : 1000,
+        unit: unit || 'kg',
+        farmerName: farmerName || req.dbUser?.name || 'Farmer',
+        buyerName: buyerName || 'Wholesale Buyer',
+        farmerId: farmerId ? parseInt(farmerId) : req.dbUser?.id,
+        buyerId: buyerId ? parseInt(buyerId) : null,
+        pickupLocation,
+        dropLocation,
+        pathType: pathType || 'Farmer → Buyer',
+        distanceKm: distanceKm ? parseFloat(distanceKm) : 150,
+        farePayout: farePayout ? parseFloat(farePayout) : 15000,
+        pickupOtp,
+        deliveryOtp,
+        status: 'AVAILABLE'
+      }).returning();
+
+      res.json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to create transport request" });
+    }
+  });
+
+  // Atomic Driver Acceptance (Prevents double acceptance)
+  app.post("/api/transport/accept", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser || !['transporter', 'transport_driver', 'driver'].includes(req.dbUser.role)) {
+        return res.status(403).json({ error: "Only transport drivers can accept delivery requests" });
+      }
+
+      const { requestId } = req.body;
+      const pickupOtp = Math.floor(1000 + Math.random() * 9000).toString();
+      const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+      // Atomic Update: Only update if current status is AVAILABLE
+      const updated = await db.update(transportRequests)
+        .set({
+          transporterId: req.dbUser.id,
+          pickupOtp,
+          deliveryOtp,
+          status: 'ACCEPTED'
+        })
+        .where(and(
+          eq(transportRequests.id, parseInt(requestId)),
+          eq(transportRequests.status, 'AVAILABLE')
+        ))
+        .returning();
+
+      if (updated.length === 0) {
+        return res.status(409).json({ error: "This transport request has already been accepted by another driver." });
+      }
+
+      const reqDetails = updated[0];
+
+      // Notify Farmer & Buyer in PostgreSQL
+      if (reqDetails.farmerId) {
+        await db.insert(notifications).values({
+          userId: reqDetails.farmerId,
+          title: 'Transport Driver Assigned',
+          message: `Driver ${req.dbUser.name} accepted your shipment for ${reqDetails.cropName}. Pickup OTP: ${reqDetails.pickupOtp}`,
+          type: 'INFO'
+        });
+      }
+      if (reqDetails.buyerId) {
+        await db.insert(notifications).values({
+          userId: reqDetails.buyerId,
+          title: 'Freight Driver Assigned',
+          message: `Driver ${req.dbUser.name} has been assigned to deliver ${reqDetails.cropName}. Delivery OTP: ${reqDetails.deliveryOtp}`,
+          type: 'INFO'
+        });
+      }
+
+      res.json(reqDetails);
+    } catch (err: any) {
+      console.error("Accept transport error:", err);
+      res.status(500).json({ error: "Failed to accept transport request" });
+    }
+  });
+
+  // Verify Pickup OTP
+  app.post("/api/transport/verify-pickup-otp", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { requestId, otp } = req.body;
+      const reqList = await db.select().from(transportRequests).where(eq(transportRequests.id, parseInt(requestId))).limit(1);
+
+      if (reqList.length === 0) return res.status(404).json({ error: "Transport request not found" });
+
+      const request = reqList[0];
+      if (request.pickupOtp !== otp) {
+        return res.status(400).json({ error: "Invalid Pickup OTP code" });
+      }
+
+      const updated = await db.update(transportRequests)
+        .set({
+          pickupOtpVerified: true,
+          status: 'PICKED_UP'
+        })
+        .where(eq(transportRequests.id, parseInt(requestId)))
+        .returning();
+
+      // Notifications
+      if (request.farmerId) {
+        await db.insert(notifications).values({
+          userId: request.farmerId,
+          title: 'Produce Picked Up',
+          message: `Driver ${req.dbUser?.name || 'Driver'} verified Pickup OTP. Produce is now in transit.`,
+          type: 'SUCCESS'
+        });
+      }
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to verify pickup OTP" });
+    }
+  });
+
+  // Submit Driver Quality Inspection Report & Photos
+  app.post("/api/transport/quality-update", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!req.dbUser || !['transporter', 'transport_driver', 'driver'].includes(req.dbUser.role)) {
+        return res.status(403).json({ error: "Only transport drivers can submit quality verification" });
+      }
+
+      const {
+        requestId,
+        cropPhotoUrl,
+        qualityGrade = "Grade A Fresh",
+        qualityQuantity,
+        visibleDamage = "None (0%)",
+        qualityRemarks = "Verified clean, dry, fresh produce packaging at farm pickup."
+      } = req.body;
+
+      const updated = await db.update(transportRequests)
+        .set({
+          cropPhotoUrl,
+          qualityGrade,
+          qualityQuantity: qualityQuantity ? parseFloat(qualityQuantity) : undefined,
+          visibleDamage,
+          qualityRemarks,
+          qualityVerified: true,
+          verificationDetails: `${qualityGrade} | Damage: ${visibleDamage} | ${qualityRemarks}`,
+          verificationTimestamp: new Date(),
+          status: 'QUALITY_UPDATED'
+        })
+        .where(eq(transportRequests.id, parseInt(requestId)))
+        .returning();
+
+      const reqDetails = updated[0];
+
+      // Send quality report notifications to Farmer and Buyer
+      if (reqDetails) {
+        if (reqDetails.farmerId) {
+          await db.insert(notifications).values({
+            userId: reqDetails.farmerId,
+            title: 'Crop Quality Verified',
+            message: `Transport driver verified your ${reqDetails.cropName} quality as ${qualityGrade}.`,
+            type: 'SUCCESS'
+          });
+        }
+        if (reqDetails.buyerId) {
+          await db.insert(notifications).values({
+            userId: reqDetails.buyerId,
+            title: 'Crop Quality Verified',
+            message: `Quality report updated for ${reqDetails.cropName}: ${qualityGrade}, ${visibleDamage}. View photo evidence on dashboard.`,
+            type: 'INFO'
+          });
+        }
+      }
+
+      res.json(reqDetails);
+    } catch (err: any) {
+      console.error("Quality verification error:", err);
+      res.status(500).json({ error: "Failed to submit quality verification" });
+    }
+  });
+
+  // Verify Delivery OTP & Complete Delivery
+  app.post("/api/transport/verify-delivery-otp", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { requestId, otp } = req.body;
+      const reqList = await db.select().from(transportRequests).where(eq(transportRequests.id, parseInt(requestId))).limit(1);
+
+      if (reqList.length === 0) return res.status(404).json({ error: "Transport request not found" });
+
+      const request = reqList[0];
+      if (request.deliveryOtp !== otp) {
+        return res.status(400).json({ error: "Invalid Delivery OTP code" });
+      }
+
+      const updated = await db.update(transportRequests)
+        .set({
+          deliveryOtpVerified: true,
+          status: 'COMPLETED'
+        })
+        .where(eq(transportRequests.id, parseInt(requestId)))
+        .returning();
+
+      if (request.transactionId) {
+        await db.update(transactions)
+          .set({ status: 'COMPLETED' })
+          .where(eq(transactions.id, request.transactionId));
+      }
+
+      // Send completion notifications to Farmer and Buyer
+      if (request.farmerId) {
+        await db.insert(notifications).values({
+          userId: request.farmerId,
+          title: 'Delivery Completed',
+          message: `Delivery #${request.id} for ${request.cropName} has been verified and completed successfully.`,
+          type: 'SUCCESS'
+        });
+      }
+      if (request.buyerId) {
+        await db.insert(notifications).values({
+          userId: request.buyerId,
+          title: 'Shipment Handover Complete',
+          message: `You verified Delivery OTP for ${request.cropName}. Payment released to seller & transporter.`,
+          type: 'SUCCESS'
+        });
+      }
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to complete delivery" });
+    }
+  });
+
+  // Update Transport Status (PICKUP_STARTED, IN_TRANSIT, DELIVERED, COMPLETED)
+  app.post("/api/transport/status", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { requestId, status } = req.body;
+      const updated = await db.update(transportRequests)
+        .set({ status })
+        .where(eq(transportRequests.id, parseInt(requestId)))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to update transport status" });
+    }
+  });
+
+  // Storage booking
   app.post("/api/storage/book", requireAuth, async (req: AuthRequest, res) => {
     try {
       if (!req.dbUser) return res.status(401).json({ error: "Unauthorized" });

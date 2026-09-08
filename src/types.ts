@@ -208,3 +208,89 @@ export interface AiRecommendation {
   suggestedActionSteps: string[];
   disclaimer: string;
 }
+
+export interface TransportRequest {
+  id: number;
+  transactionId?: number | null;
+  transporterId?: number | null;
+  cropName: string;
+  quantity: number;
+  unit: string;
+  farmerName: string;
+  buyerName: string;
+  farmerId?: number | null;
+  buyerId?: number | null;
+  pickupLocation: string;
+  dropLocation: string;
+  pathType: 'Farmer → Buyer' | 'Farmer → FPO' | 'Farmer → Storehouse';
+  distanceKm: number;
+  farePayout: number;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropLat?: number | null;
+  dropLng?: number | null;
+  pickupOtp?: string | null;
+  deliveryOtp?: string | null;
+  pickupOtpVerified?: boolean;
+  deliveryOtpVerified?: boolean;
+  qualityGrade?: string | null;
+  qualityQuantity?: number | null;
+  visibleDamage?: string | null;
+  qualityRemarks?: string | null;
+  cropPhotoUrl?: string | null;
+  qualityVerified?: boolean;
+  verificationDetails?: string | null;
+  verificationTimestamp?: string | null;
+  status: 'REQUESTED' | 'AVAILABLE' | 'ACCEPTED' | 'DRIVER_ASSIGNED' | 'DRIVER_ARRIVING' | 'AT_PICKUP' | 'PICKED_UP' | 'IN_TRANSIT' | 'QUALITY_UPDATED' | 'OUT_FOR_DELIVERY' | 'AT_DELIVERY' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+}
+
+export interface Payment {
+  id: number;
+  userId: number;
+  orderId?: number | null;
+  transactionId?: number | null;
+  transportRequestId?: number | null;
+  razorpayOrderId: string;
+  razorpayPaymentId?: string | null;
+  razorpaySignature?: string | null;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentStatus: 'CREATED' | 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  failureReason?: string | null;
+  payerName?: string | null;
+  receiverName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Invoice {
+  id: number;
+  paymentId: number;
+  transactionId?: number | null;
+  invoiceNumber: string;
+  gstin?: string | null;
+  sellerName: string;
+  sellerGstin?: string | null;
+  buyerName: string;
+  buyerGstin?: string | null;
+  taxableAmount: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  totalTax: number;
+  totalAmount: number;
+  createdAt: string;
+}
+
+export interface AppNotification {
+  id: number;
+  userId: number;
+  title: string;
+  message: string;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+  isRead: boolean;
+  createdAt: string;
+}
+

@@ -33,6 +33,7 @@ import { EcosystemMapView } from '../components/EcosystemMapView';
 import { ChatWidget } from '../components/ChatWidget';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useLanguage } from '../i18n/LanguageContext';
+import { RazorpayPaymentModal } from '../components/RazorpayPaymentModal';
 import { BENCHMARK_MANDI_PRICES, BENCHMARK_WAREHOUSES, BENCHMARK_BUYER_DEMANDS } from '../services/marketData';
 import { Crop as AppCrop } from '../types';
 
@@ -107,6 +108,8 @@ export const FarmerDashboard: React.FC = () => {
   const [chatRecipient, setChatRecipient] = useState({ id: 2, name: 'Reliance Fresh Agro Procurement' });
   const [mockPaymentSuccess, setMockPaymentSuccess] = useState('');
   const [notification, setNotification] = useState('');
+  const [razorpayModalOpen, setRazorpayModalOpen] = useState(false);
+  const [razorpayPaymentData, setRazorpayPaymentData] = useState<{ amount: number; description: string; cropName: string } | null>(null);
 
   // Active delivery dynamic state
   const [activeDelivery, setActiveDelivery] = useState<any>(() => {
@@ -330,7 +333,7 @@ export const FarmerDashboard: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-white bg-[#065f46] px-2.5 py-0.5 rounded-md uppercase tracking-wider">
-                  FARMORA FARMER PORTAL
+                  {t('farmer.portalBadge', 'FARMORA FARMER PORTAL')}
                 </span>
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
                   {t('farmer.verifiedBadge', 'Verified Producer')}
@@ -355,7 +358,7 @@ export const FarmerDashboard: React.FC = () => {
                   <span className="text-xs font-bold text-[#022c22] block max-w-[140px] truncate">
                     {appUser?.name || user?.displayName || user?.email}
                   </span>
-                  <span className="text-[10px] font-bold text-[#065f46] uppercase tracking-wider">Farmer Account</span>
+                  <span className="text-[10px] font-bold text-[#065f46] uppercase tracking-wider">{t('farmer.accountLabel', 'Farmer Account')}</span>
                 </div>
                 <button
                   onClick={async () => { await logout(); navigate('/auth'); }}
@@ -411,7 +414,7 @@ export const FarmerDashboard: React.FC = () => {
                 </div>
 
                 <span className="hidden sm:inline-block px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-black border border-emerald-200">
-                  Sample: Tomato
+                  {t('farmer.sampleLabel', 'Sample: Tomato')}
                 </span>
               </div>
 
@@ -433,11 +436,11 @@ export const FarmerDashboard: React.FC = () => {
                       onChange={(e) => setCropName(e.target.value)}
                       className="w-full p-3.5 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
                     >
-                      <option value="Tomato">Tomato</option>
-                      <option value="Wheat">Wheat</option>
-                      <option value="Onion">Onion</option>
-                      <option value="Potato">Potato</option>
-                      <option value="Rice">Rice</option>
+                      <option value="Tomato">{t('common.cropTomato', 'Tomato')}</option>
+                      <option value="Wheat">{t('common.cropWheat', 'Wheat')}</option>
+                      <option value="Onion">{t('common.cropOnion', 'Onion')}</option>
+                      <option value="Potato">{t('common.cropPotato', 'Potato')}</option>
+                      <option value="Rice">{t('common.cropRice', 'Rice')}</option>
                     </select>
                   </div>
 
@@ -448,10 +451,10 @@ export const FarmerDashboard: React.FC = () => {
                       onChange={(e) => setQuality(e.target.value)}
                       className="w-full p-3.5 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
                     >
-                      <option value="Grade A Fresh">Grade A Fresh (Wholesale Standard)</option>
-                      <option value="Grade A Organic">Grade A Organic (Certified)</option>
-                      <option value="Export Grade (55mm+)">Export Grade (55mm+)</option>
-                      <option value="Standard Grade B">Standard Grade B</option>
+                      <option value="Grade A Fresh">{t('common.gradeAFresh', 'Grade A Fresh (Wholesale Standard)')}</option>
+                      <option value="Grade A Organic">{t('common.gradeAOrganic', 'Grade A Organic (Certified)')}</option>
+                      <option value="Export Grade (55mm+)">{t('common.gradeExport', 'Export Grade (55mm+)')}</option>
+                      <option value="Standard Grade B">{t('common.gradeB', 'Standard Grade B')}</option>
                     </select>
                   </div>
                 </div>
@@ -477,9 +480,9 @@ export const FarmerDashboard: React.FC = () => {
                       onChange={(e) => setUnit(e.target.value)}
                       className="w-full p-3.5 rounded-2xl border border-[#10b981]/30 text-xs font-bold bg-[#f6faf6] text-[#022c22] focus:outline-none focus:border-[#10b981] focus:bg-white"
                     >
-                      <option value="kg">Kilograms (kg)</option>
-                      <option value="Quintal">Quintals (100 kg)</option>
-                      <option value="Tonnes">Tonnes (1000 kg)</option>
+                      <option value="kg">{t('common.unitKg', 'Kilograms (kg)')}</option>
+                      <option value="Quintal">{t('common.unitQuintal', 'Quintals (100 kg)')}</option>
+                      <option value="Tonnes">{t('common.unitTonnes', 'Tonnes (1000 kg)')}</option>
                     </select>
                   </div>
 
@@ -498,7 +501,7 @@ export const FarmerDashboard: React.FC = () => {
 
                 {/* Total Calculated Cost */}
                 <div className="p-4 bg-[#e1f2e6] rounded-2xl border border-[#10b981]/40 flex justify-between items-center shadow-inner">
-                  <span className="text-sm font-bold text-[#065f46]">Estimated Total Value</span>
+                  <span className="text-sm font-bold text-[#065f46]">{t('farmer.estimatedValue', 'Estimated Total Value')}</span>
                   <span className="text-lg font-black text-[#022c22]">
                     ₹{(parseFloat(quantity || '0') * parseFloat(price || '0')).toLocaleString('en-IN')}
                   </span>
@@ -578,18 +581,18 @@ export const FarmerDashboard: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white/95 backdrop-blur-xl border-1.5 border-[#10b981]/30 shadow-md">
               <div>
                 <span className="text-[10px] font-black text-white bg-[#065f46] px-2.5 py-0.5 rounded-md uppercase tracking-wider">
-                  DIRECT WHOLESALE MARKETPLACE
+                  {t('farmer.directMarketplaceBadge', 'DIRECT WHOLESALE MARKETPLACE')}
                 </span>
-                <h2 className="text-xl sm:text-2xl font-black text-[#022c22] mt-1">Farmer-to-Buyer Marketplace & Crop Upload</h2>
-                <p className="text-xs text-[#065f46] font-semibold">Upload your crop details below to publish them directly to the Buyer Portal for wholesale procurement.</p>
+                <h2 className="text-xl sm:text-2xl font-black text-[#022c22] mt-1">{t('farmer.marketplaceTitle', 'Farmer-to-Buyer Marketplace & Crop Upload')}</h2>
+                <p className="text-xs text-[#065f46] font-semibold">{t('farmer.marketplaceDesc', 'Upload your crop details below to publish them directly to the Buyer Portal for wholesale procurement.')}</p>
               </div>
 
               <div className="flex items-center gap-2">
                 <span className="px-3.5 py-1.5 rounded-2xl bg-emerald-100 text-emerald-900 text-xs font-black border border-emerald-300">
-                  {crops.length} Crop Listing(s) Published
+                  {crops.length} {t('farmer.cropListingsPublished', 'Crop Listing(s) Published')}
                 </span>
                 <span className="px-3.5 py-1.5 rounded-2xl bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
-                  {offers.length} Buyer Offer(s) Received
+                  {offers.length} {t('farmer.buyerOffersReceived', 'Buyer Offer(s) Received')}
                 </span>
               </div>
             </div>
@@ -860,8 +863,12 @@ export const FarmerDashboard: React.FC = () => {
               </div>
               <button 
                 onClick={() => {
-                  setMockPaymentSuccess('storage');
-                  setTimeout(() => setMockPaymentSuccess(''), 5000);
+                  setRazorpayPaymentData({
+                    amount: 2500,
+                    description: `Cold Storage Space Booking (${quantity} ${unit} ${cropName})`,
+                    cropName: cropName || 'Tomato'
+                  });
+                  setRazorpayModalOpen(true);
                 }}
                 className="px-5 py-2.5 bg-[#065f46] text-white font-black text-xs rounded-xl shadow-md hover:bg-[#10b981] transition-all flex items-center gap-2 cursor-pointer"
               >
@@ -892,8 +899,12 @@ export const FarmerDashboard: React.FC = () => {
               </div>
               <button 
                 onClick={() => {
-                  setMockPaymentSuccess('fpo');
-                  setTimeout(() => setMockPaymentSuccess(''), 5000);
+                  setRazorpayPaymentData({
+                    amount: 500,
+                    description: `FPO Membership & Aggregation Fee (${cropName})`,
+                    cropName: cropName || 'Tomato'
+                  });
+                  setRazorpayModalOpen(true);
                 }}
                 className="px-5 py-2.5 bg-[#065f46] text-white font-black text-xs rounded-xl shadow-md hover:bg-[#10b981] transition-all flex items-center gap-2 cursor-pointer"
               >
@@ -961,6 +972,20 @@ export const FarmerDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Pickup OTP Code Banner */}
+            <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-amber-700" />
+                <div>
+                  <span className="text-xs font-black text-amber-900 uppercase block">{t('otp.pickupOtp', 'Farm Pickup OTP Code')}</span>
+                  <span className="text-xs font-semibold text-amber-800">Provide this 4-digit code to your transport driver upon cargo pickup to verify handover.</span>
+                </div>
+              </div>
+              <div className="px-4 py-2 bg-amber-950 text-amber-200 rounded-xl font-mono text-xl font-black tracking-widest border border-amber-400 shadow-inner">
+                {activeDelivery?.pickupOtp || '8492'}
+              </div>
+            </div>
+
             {/* Quality Verification Audit Badge if verified by driver */}
             {activeDelivery?.qualityVerification && (
               <div className="p-4 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/40 text-xs font-semibold text-[#065f46] flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1010,6 +1035,21 @@ export const FarmerDashboard: React.FC = () => {
         currentUserId={appUser?.id || 1}
         recipientId={chatRecipient.id}
       />
+
+      {/* Razorpay Payment Modal */}
+      {razorpayModalOpen && razorpayPaymentData && (
+        <RazorpayPaymentModal
+          isOpen={razorpayModalOpen}
+          onClose={() => setRazorpayModalOpen(false)}
+          amount={razorpayPaymentData.amount}
+          itemTitle={razorpayPaymentData.description}
+          onSuccess={() => {
+            setRazorpayModalOpen(false);
+            setMockPaymentSuccess(razorpayPaymentData.amount > 1000 ? 'storage' : 'fpo');
+            setTimeout(() => setMockPaymentSuccess(''), 5000);
+          }}
+        />
+      )}
 
     </div>
   );

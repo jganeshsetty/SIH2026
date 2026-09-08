@@ -31,6 +31,7 @@ import { EcosystemMapView } from '../components/EcosystemMapView';
 import { ChatWidget } from '../components/ChatWidget';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useLanguage } from '../i18n/LanguageContext';
+import { RazorpayPaymentModal } from '../components/RazorpayPaymentModal';
 import { BENCHMARK_BUYER_DEMANDS } from '../services/marketData';
 import { BuyerDemand } from '../types';
 
@@ -61,6 +62,7 @@ interface BuyerOrder {
   currentLocation: string;
   estimatedArrival: string;
   buyerDestination: string;
+  deliveryOtp?: string;
 }
 
 const INITIAL_CROPS: AvailableCrop[] = [
@@ -100,6 +102,18 @@ export const BuyerDashboard: React.FC = () => {
   const { user, appUser, logout } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'available-crops' | 'my-orders' | 'post-demand' | 'map' | 'delivery'>('available-crops');
+
+  // Razorpay Payment Modal State
+  const [paymentModal, setPaymentModal] = useState<{
+    isOpen: boolean;
+    amount: number;
+    itemTitle: string;
+    targetCrop?: AvailableCrop;
+  }>({
+    isOpen: false,
+    amount: 0,
+    itemTitle: ''
+  });
 
   // Voice navigation listener
   useEffect(() => {
@@ -309,6 +323,21 @@ export const BuyerDashboard: React.FC = () => {
       {/* 3D Botanical Parallax Background */}
       <BotanicalParallaxBackground />
 
+      {/* Razorpay Payment Modal */}
+      <RazorpayPaymentModal
+        isOpen={paymentModal.isOpen}
+        onClose={() => setPaymentModal(prev => ({ ...prev, isOpen: false }))}
+        amount={paymentModal.amount}
+        itemTitle={paymentModal.itemTitle}
+        onSuccess={(payment, invoice) => {
+          if (paymentModal.targetCrop) {
+            processAcceptFarmerOffer(paymentModal.targetCrop);
+            setToastMsg(`Payment Verified via Razorpay UPI! Invoice #${invoice?.invoiceNumber || ''} generated.`);
+            setTimeout(() => setToastMsg(''), 4000);
+          }
+        }}
+      />
+
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 bg-[#065f46] text-white px-6 py-4 rounded-2xl shadow-2xl border border-[#10b981]/50 flex items-center gap-3 animate-bounce">
@@ -332,7 +361,7 @@ export const BuyerDashboard: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-white bg-[#065f46] px-2.5 py-0.5 rounded-md uppercase tracking-wider">
-                  FARMORA BUYER PORTAL
+                  {t('buyer.portalBadge', 'FARMORA BUYER PORTAL')}
                 </span>
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
                   {t('buyer.wholesaleBadge', 'Wholesale Procurement')}
@@ -356,7 +385,7 @@ export const BuyerDashboard: React.FC = () => {
                   <span className="text-xs font-bold text-[#022c22] block max-w-[140px] truncate">
                     {appUser?.name || user?.displayName || user?.email}
                   </span>
-                  <span className="text-[10px] font-bold text-[#065f46] uppercase tracking-wider">Buyer Account</span>
+                  <span className="text-[10px] font-bold text-[#065f46] uppercase tracking-wider">{t('buyer.accountLabel', 'Buyer Account')}</span>
                 </div>
                 <button
                   onClick={async () => { await logout(); navigate('/auth'); }}
@@ -446,8 +475,8 @@ export const BuyerDashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-[#022c22]">Available Farmer Produce</h2>
-                <p className="text-xs text-[#065f46] font-semibold">Direct listings from verified regional producers ready for procurement.</p>
+                <h2 className="text-xl font-black text-[#022c22]">{t('buyer.availableCropsHeading', 'Live Verified Farmer Crop Inventory')}</h2>
+                <p className="text-xs text-[#065f46] font-semibold">{t('buyer.availableCropsSubheading', 'Direct listings from verified regional producers ready for procurement.')}</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300">
                 {crops.length} Listed Harvest(s)
@@ -485,11 +514,18 @@ export const BuyerDashboard: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => { setSelectedCrop(crop); setPaymentStep('review'); }}
+                      onClick={() => {
+                        setPaymentModal({
+                          isOpen: true,
+                          amount: crop.quantity * crop.pricePerUnit,
+                          itemTitle: `${crop.quantity} ${crop.unit} of ${crop.name} from ${crop.farmerName}`,
+                          targetCrop: crop
+                        });
+                      }}
                       className="py-3 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-colors flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                     >
                       <CreditCard className="w-4 h-4" />
-                      <span>Buy Direct (₹{(crop.quantity * crop.pricePerUnit).toLocaleString('en-IN')})</span>
+                      <span>{t('buyer.buyNowBtn', 'Buy Direct')} (₹{(crop.quantity * crop.pricePerUnit).toLocaleString('en-IN')})</span>
                     </button>
                   </div>
                 </div>
@@ -503,8 +539,8 @@ export const BuyerDashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-[#022c22]">Purchase Orders & Escrow Status</h2>
-                <p className="text-xs text-[#065f46] font-semibold">Track order confirmations, escrow payments, and supplier notifications.</p>
+                <h2 className="text-xl font-black text-[#022c22]">{t('buyer.ordersHeading', 'Purchase Orders & Escrow Status')}</h2>
+                <p className="text-xs text-[#065f46] font-semibold">{t('buyer.ordersSubheading', 'Track order confirmations, escrow payments, and supplier notifications.')}</p>
               </div>
             </div>
 
@@ -537,6 +573,20 @@ export const BuyerDashboard: React.FC = () => {
                     <span>Track Live GPS</span>
                   </button>
                 </div>
+
+                {/* Delivery OTP Badge for Buyer */}
+                <div className="w-full mt-3 p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-between sm:col-span-2">
+                  <div className="flex items-center gap-2 text-indigo-900">
+                    <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold block">{t('otp.deliveryOtp', 'Buyer Delivery OTP Code')}:</span>
+                      <span className="text-[11px] text-indigo-700">Hand this code to driver when shipment arrives to verify delivery and release escrow.</span>
+                    </div>
+                  </div>
+                  <span className="px-3.5 py-1.5 bg-indigo-950 text-indigo-200 rounded-xl font-mono font-black text-base tracking-widest border border-indigo-400 shrink-0">
+                    {order.deliveryOtp || '5921'}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -553,15 +603,15 @@ export const BuyerDashboard: React.FC = () => {
                   <Target className="w-6 h-6 text-[#10b981]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-[#022c22]">Post Bulk Crop Requirement</h2>
-                  <p className="text-xs text-[#065f46] font-semibold">Broadcast specs to regional Farmers & FPOs with automated matching.</p>
+                  <h2 className="text-xl font-black text-[#022c22]">{t('buyer.postDemandHeading', 'Post Bulk Crop Requirement')}</h2>
+                  <p className="text-xs text-[#065f46] font-semibold">{t('buyer.postDemandSubheading', 'Broadcast specs to regional Farmers & FPOs with automated matching.')}</p>
                 </div>
               </div>
 
               <form onSubmit={handlePostDemand} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1">Crop Name *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">{t('common.cropNameLabel', 'Crop Name *')}</label>
                     <input
                       type="text"
                       required
@@ -572,7 +622,7 @@ export const BuyerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1">Required Grade / Quality *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">{t('common.requiredGradeLabel', 'Required Grade / Quality *')}</label>
                     <select
                       value={requiredGrade}
                       onChange={(e) => setRequiredGrade(e.target.value)}
@@ -588,7 +638,7 @@ export const BuyerDashboard: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1">Quantity (kg) *</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">{t('buyer.requiredQtyLabel', 'Quantity (kg) *')}</label>
                     <input
                       type="number"
                       required
@@ -599,7 +649,7 @@ export const BuyerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1">Target Min Price (₹/kg)</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">{t('buyer.targetMinPriceLabel', 'Target Min Price (₹/kg)')}</label>
                     <input
                       type="number"
                       value={minPrice}
@@ -609,7 +659,7 @@ export const BuyerDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-[#022c22] mb-1">Target Max Price (₹/kg)</label>
+                    <label className="block text-xs font-black text-[#022c22] mb-1">{t('buyer.targetMaxPriceLabel', 'Target Max Price (₹/kg)')}</label>
                     <input
                       type="number"
                       value={maxPrice}
@@ -620,7 +670,7 @@ export const BuyerDashboard: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-[#022c22] mb-1">Delivery Destination Hub</label>
+                  <label className="block text-xs font-black text-[#022c22] mb-1">{t('buyer.destinationLabel', 'Delivery Destination Hub')}</label>
                   <input
                     type="text"
                     value={deliveryLocation}
@@ -634,7 +684,7 @@ export const BuyerDashboard: React.FC = () => {
                   className="w-full py-4 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Target className="w-5 h-5 text-[#a7f3d0]" />
-                  <span>Post Demand & Enable Smart Farmer Matching</span>
+                  <span>{t('buyer.postDemandBtn', 'Post Demand & Enable Smart Farmer Matching')}</span>
                 </button>
               </form>
             </div>
@@ -777,48 +827,23 @@ export const BuyerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* PAYMENT / ESCROW MODAL */}
+        {/* PAYMENT / ESCROW MODAL INTEGRATED WITH RAZORPAY UPI */}
         {selectedCrop && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 max-w-md w-full border-2 border-[#10b981] shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b pb-3">
-                <h3 className="font-black text-base text-[#022c22]">Escrow Payment Authorization</h3>
-                <button onClick={() => setSelectedCrop(null)} className="text-gray-400 font-bold p-1">✕</button>
-              </div>
-
-              {paymentStep === 'review' && (
-                <div className="space-y-3 text-xs font-semibold text-[#065f46]">
-                  <p>Crop: <span className="font-bold text-black">{selectedCrop.name}</span></p>
-                  <p>Quantity: <span className="font-bold text-black">{selectedCrop.quantity} {selectedCrop.unit}</span></p>
-                  <p>Total Escrow Lock: <span className="font-black text-[#065f46] text-base">₹{(selectedCrop.quantity * selectedCrop.pricePerUnit).toLocaleString('en-IN')}</span></p>
-
-                  <button
-                    onClick={() => {
-                      processAcceptFarmerOffer(selectedCrop);
-                      setPaymentStep('success');
-                      setTimeout(() => {
-                        setSelectedCrop(null);
-                        setActiveTab('my-orders');
-                      }, 1500);
-                    }}
-                    className="w-full py-3.5 rounded-2xl bg-[#065f46] text-white font-black text-xs hover:bg-[#10b981] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
-                    <span>Confirm Escrow Lock & Dispatch</span>
-                  </button>
-                </div>
-              )}
-
-              {paymentStep === 'success' && (
-                <div className="py-6 text-center space-y-2">
-                  <CheckCircle2 className="w-12 h-12 text-[#10b981] mx-auto animate-bounce" />
-                  <h4 className="font-black text-base text-[#022c22]">Escrow Payment Locked!</h4>
-                  <p className="text-xs text-[#065f46]">Order created & driver dispatch notified.</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <RazorpayPaymentModal
+            isOpen={!!selectedCrop}
+            onClose={() => setSelectedCrop(null)}
+            amount={selectedCrop.quantity * selectedCrop.pricePerUnit}
+            itemTitle={`Procurement of ${selectedCrop.name} (${selectedCrop.quantity} ${selectedCrop.unit})`}
+            sellerName={selectedCrop.farmerName || "Farmora Registered Producer"}
+            buyerName={appUser?.name || "Wholesale Buyer"}
+            onSuccess={() => {
+              processAcceptFarmerOffer(selectedCrop);
+              setSelectedCrop(null);
+              setActiveTab('my-orders');
+            }}
+          />
         )}
+
 
       </div>
 

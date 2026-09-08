@@ -22,6 +22,7 @@ import { LiveTrackingMap } from '../components/LiveTrackingMap';
 import { BotanicalParallaxBackground } from '../components/BotanicalParallaxBackground';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useLanguage } from '../i18n/LanguageContext';
+import { DriverVerificationModal } from '../components/DriverVerificationModal';
 
 export interface DeliveryRequest {
   id: number;
@@ -100,6 +101,15 @@ export const TransporterDashboard: React.FC = () => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'available' | 'active'>('available');
 
+  // Verification Modal State
+  const [verificationModal, setVerificationModal] = useState<{
+    isOpen: boolean;
+    mode: 'PICKUP_OTP' | 'QUALITY_REPORT' | 'DELIVERY_OTP';
+  }>({
+    isOpen: false,
+    mode: 'PICKUP_OTP'
+  });
+
   // Voice navigation listener
   useEffect(() => {
     const handleVoiceNav = (e: any) => {
@@ -148,9 +158,9 @@ export const TransporterDashboard: React.FC = () => {
               quantity: r.quantity || 5000,
               unit: r.unit || 'kg',
               farmerName: r.farmerName || 'Farmer',
-              farmerLocation: r.pickupLocation,
+              farmerLocation: r.pickupLocation || 'Nashik, Maharashtra',
               buyerName: r.buyerName || 'Wholesale Buyer',
-              buyerLocation: r.dropLocation,
+              buyerLocation: r.dropLocation || 'Mumbai, Maharashtra',
               pathType: (r.pathType as any) || 'Farmer → Buyer',
               distanceKm: r.distanceKm || 150,
               farePayout: r.farePayout || 18000,
@@ -183,16 +193,22 @@ export const TransporterDashboard: React.FC = () => {
     const updated: DeliveryRequest = {
       ...delivery,
       isAccepted: true,
-      status: 'PICKUP'
+      status: 'ACCEPTED'
     };
 
     try {
       if (token) {
-        await fetch('/api/transport/accept', {
+        const acceptRes = await fetch('/api/transport/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ requestId: delivery.id })
         });
+        if (acceptRes.status === 409) {
+          const errData = await acceptRes.json();
+          setToastMsg(errData.error || 'Request already accepted by another driver.');
+          setTimeout(() => setToastMsg(''), 3000);
+          return;
+        }
       }
     } catch (e) {
       console.warn('Backend accept transport request error:', e);
@@ -305,6 +321,24 @@ export const TransporterDashboard: React.FC = () => {
       {/* 3D Botanical Parallax Background */}
       <BotanicalParallaxBackground />
 
+      {/* Driver Verification OTP & Quality Modal */}
+      {activeDelivery && (
+        <DriverVerificationModal
+          isOpen={verificationModal.isOpen}
+          onClose={() => setVerificationModal(prev => ({ ...prev, isOpen: false }))}
+          mode={verificationModal.mode}
+          transportRequestId={activeDelivery.id}
+          cropName={activeDelivery.cropName}
+          onSuccess={(updatedBackendReq) => {
+            if (verificationModal.mode === 'PICKUP_OTP') {
+              handleUpdateStatus('IN_TRANSIT');
+            } else if (verificationModal.mode === 'DELIVERY_OTP') {
+              handleUpdateStatus('DELIVERED');
+            }
+          }}
+        />
+      )}
+
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 bg-[#065f46] text-white px-6 py-4 rounded-2xl shadow-2xl border border-[#10b981]/50 flex items-center gap-3 animate-bounce">
@@ -320,7 +354,7 @@ export const TransporterDashboard: React.FC = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/')} 
-              className="p-2.5 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/40 text-[#065f46] hover:bg-[#10b981] hover:text-white transition-all shadow-xs"
+              className="p-2.5 rounded-2xl bg-[#e1f2e6] border border-[#10b981]/40 text-[#065f46] hover:bg-[#10b981] hover:text-white transition-all shadow-xs cursor-pointer"
               title="Return to Home"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -328,7 +362,7 @@ export const TransporterDashboard: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-white bg-[#065f46] px-2.5 py-0.5 rounded-md uppercase tracking-wider">
-                  FARMORA TRANSPORT PORTAL
+                  {t('transporter.portalBadge', 'FARMORA TRANSPORT PORTAL')}
                 </span>
                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
                   {t('transporter.freightBadge', 'Freight Driver')}
@@ -348,16 +382,14 @@ export const TransporterDashboard: React.FC = () => {
                 <div className="w-8 h-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs">
                   {(appUser?.name || user?.displayName || user?.email || 'T')[0].toUpperCase()}
                 </div>
-                <div className="text-left leading-tight hidden sm:block">
-                  <span className="text-xs font-bold text-[#022c22] block max-w-[140px] truncate">
-                    {appUser?.name || user?.displayName || user?.email}
-                  </span>
-                  <span className="text-[10px] font-bold text-[#065f46] uppercase tracking-wider">Transport Driver</span>
+                <div className="leading-tight text-left">
+                  <span className="text-xs font-extrabold text-[#022c22] block leading-none">{appUser?.name || user?.displayName || 'Driver'}</span>
+                  <span className="text-[10px] font-bold text-[#065f46] block uppercase tracking-wider">Transport Driver</span>
                 </div>
                 <button
                   onClick={async () => { await logout(); navigate('/auth'); }}
                   title="Sign Out"
-                  className="p-1.5 rounded-xl text-[#065f46] hover:bg-rose-100 hover:text-rose-600 transition-colors ml-1 flex items-center gap-1 font-bold text-xs"
+                  className="p-1.5 rounded-xl text-[#065f46] hover:bg-rose-100 hover:text-rose-600 transition-colors ml-1 flex items-center gap-1 font-bold text-xs cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="hidden md:inline">{t('common.logout', 'Logout')}</span>
@@ -372,7 +404,7 @@ export const TransporterDashboard: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('available')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'available' 
                   ? 'bg-[#065f46] text-white shadow-md' 
                   : 'text-[#065f46] hover:bg-[#e1f2e6]'
@@ -384,7 +416,7 @@ export const TransporterDashboard: React.FC = () => {
 
             <button
               onClick={() => setActiveTab('active')}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${
+              className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'active' 
                   ? 'bg-[#065f46] text-white shadow-md' 
                   : 'text-[#065f46] hover:bg-[#e1f2e6]'
@@ -401,7 +433,7 @@ export const TransporterDashboard: React.FC = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-[#022c22]">Available Delivery Requests</h2>
+                <h2 className="text-xl font-black text-[#022c22]">{t('transporter.deliveryRequestsHeading', 'Available Delivery Requests')}</h2>
                 <p className="text-xs text-[#065f46] font-semibold">Select and accept agricultural freight jobs across regional supply chains.</p>
               </div>
             </div>
@@ -429,7 +461,7 @@ export const TransporterDashboard: React.FC = () => {
                       <div className="flex items-start gap-1.5 bg-[#f6faf6] p-2.5 rounded-xl border border-gray-100">
                         <MapPin className="w-4 h-4 text-[#10b981] shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] text-gray-500 font-bold block uppercase">Producer Pickup</span>
+                          <span className="text-[10px] text-gray-500 font-bold block uppercase">{t('transporter.pickupLocation', 'Producer Pickup')}</span>
                           <strong className="text-[#022c22]">{del.farmerName}</strong>
                           <span className="block text-gray-600 font-medium">{del.farmerLocation}</span>
                         </div>
@@ -438,7 +470,7 @@ export const TransporterDashboard: React.FC = () => {
                       <div className="flex items-start gap-1.5 bg-[#f6faf6] p-2.5 rounded-xl border border-gray-100">
                         <Navigation className="w-4 h-4 text-[#10b981] shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] text-gray-500 font-bold block uppercase">Delivery Destination</span>
+                          <span className="text-[10px] text-gray-500 font-bold block uppercase">{t('transporter.dropoffLocation', 'Delivery Destination')}</span>
                           <strong className="text-[#022c22]">{del.buyerName}</strong>
                           <span className="block text-gray-600 font-medium">{del.buyerLocation}</span>
                         </div>
@@ -463,7 +495,7 @@ export const TransporterDashboard: React.FC = () => {
                         className="px-6 py-3.5 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 border border-[#10b981]/40 cursor-pointer"
                       >
                         <Truck className="w-4 h-4 text-[#a7f3d0]" />
-                        <span>ACCEPT DELIVERY OFFER</span>
+                        <span>{t('transporter.acceptDeliveryBtn', 'ACCEPT DELIVERY OFFER')}</span>
                       </button>
                     )}
                   </div>
@@ -479,7 +511,7 @@ export const TransporterDashboard: React.FC = () => {
             {!activeDelivery ? (
               <div className="p-12 text-center rounded-3xl bg-white/80 border-1.5 border-[#10b981]/30 shadow-md">
                 <Truck className="w-12 h-12 text-[#10b981]/50 mx-auto mb-3" />
-                <p className="text-sm font-extrabold text-[#065f46]">No active delivery selected. Accept an offer from Available Delivery Offers.</p>
+                <p className="text-sm font-extrabold text-[#065f46]">{t('transporter.noActiveDeliveryMsg', 'No active delivery selected. Accept an offer from Available Delivery Offers.')}</p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -510,12 +542,12 @@ export const TransporterDashboard: React.FC = () => {
                   {/* Route & Locations */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-2xl bg-[#e1f2e6]/70 border border-[#10b981]/30 text-xs font-semibold text-[#065f46]">
                     <div>
-                      <span className="text-[10px] font-black text-[#065f46]/70 uppercase block">FARMER PICKUP LOCATION</span>
+                      <span className="text-[10px] font-black text-[#065f46]/70 uppercase block">{t('transporter.farmerPickupHeader', 'FARMER PICKUP LOCATION')}</span>
                       <strong className="text-sm text-[#022c22] block">{activeDelivery.farmerName}</strong>
                       <span>{activeDelivery.farmerLocation}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-black text-[#065f46]/70 uppercase block">DELIVERY DESTINATION ({activeDelivery.pathType})</span>
+                      <span className="text-[10px] font-black text-[#065f46]/70 uppercase block">{t('transporter.destinationHeader', 'DELIVERY DESTINATION')} ({activeDelivery.pathType})</span>
                       <strong className="text-sm text-[#022c22] block">{activeDelivery.buyerName}</strong>
                       <span>{activeDelivery.buyerLocation}</span>
                     </div>
@@ -532,76 +564,39 @@ export const TransporterDashboard: React.FC = () => {
                   />
 
                   {/* STEP 1: CROP QUALITY INSPECTION AT PICKUP */}
-                  {activeDelivery.status === 'PICKUP' && (
+                  {activeDelivery.status === 'ACCEPTED' || activeDelivery.status === 'PICKUP' ? (
                     <div className="p-6 rounded-3xl bg-white border-2 border-[#10b981] shadow-lg space-y-5">
                       <div className="flex items-center gap-3 pb-3 border-b border-[#10b981]/20">
                         <div className="w-10 h-10 rounded-2xl bg-[#e1f2e6] flex items-center justify-center text-[#065f46]">
                           <Camera className="w-5 h-5 text-[#10b981]" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-black text-[#022c22]">Pickup Crop Quality Verification & Photo Inspection</h3>
-                          <p className="text-xs text-[#065f46] font-semibold">Verify crop condition against farmer specs before loading into truck.</p>
+                          <h3 className="text-lg font-black text-[#022c22]">{t('transporter.qualityVerificationHeading', 'Pickup Crop Quality Verification & Photo Inspection')}</h3>
+                          <p className="text-xs text-[#065f46] font-semibold">Verify crop condition and enter Farmer Pickup OTP to start transit.</p>
                         </div>
                       </div>
 
-                      {/* Checklist */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <label className="flex items-center gap-2 p-3 rounded-xl bg-[#f6faf6] border border-[#10b981]/30 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isGradeA}
-                            onChange={(e) => setIsGradeA(e.target.checked)}
-                            className="w-4 h-4 text-[#10b981] rounded focus:ring-0"
-                          />
-                          <span className="text-xs font-bold text-[#022c22]">Grade A Freshness Verified</span>
-                        </label>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setVerificationModal({ isOpen: true, mode: 'QUALITY_REPORT' })}
+                          className="flex-1 py-3.5 px-4 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 border border-[#10b981]/40 cursor-pointer"
+                        >
+                          <Camera className="w-4 h-4 text-[#a7f3d0]" />
+                          <span>{t('transporter.uploadPhotoBtn', 'Submit Quality & Photo Report')}</span>
+                        </button>
 
-                        <label className="flex items-center gap-2 p-3 rounded-xl bg-[#f6faf6] border border-[#10b981]/30 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isMoistureOK}
-                            onChange={(e) => setIsMoistureOK(e.target.checked)}
-                            className="w-4 h-4 text-[#10b981] rounded focus:ring-0"
-                          />
-                          <span className="text-xs font-bold text-[#022c22]">Moisture & Temp Compliant</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-3 rounded-xl bg-[#f6faf6] border border-[#10b981]/30 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isPackagingOK}
-                            onChange={(e) => setIsPackagingOK(e.target.checked)}
-                            className="w-4 h-4 text-[#10b981] rounded focus:ring-0"
-                          />
-                          <span className="text-xs font-bold text-[#022c22]">Crates & Sorting Approved</span>
-                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setVerificationModal({ isOpen: true, mode: 'PICKUP_OTP' })}
+                          className="flex-1 py-3.5 px-4 rounded-2xl bg-[#10b981] hover:bg-[#047857] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 border border-white/30 cursor-pointer"
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>{t('otp.enterPickupOtpBtn', 'Enter Farmer Pickup OTP')}</span>
+                        </button>
                       </div>
-
-                      {/* Photo Capture & Upload Box */}
-                      <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-[#f6faf6] border border-dashed border-[#10b981]/40">
-                        <img src={inspectionPhoto} alt="Inspection Photo" className="w-28 h-28 rounded-xl object-cover border border-[#10b981]/30 shadow-xs" />
-                        
-                        <div className="space-y-2 flex-1 text-center sm:text-left">
-                          <span className="text-xs font-black text-[#022c22] block">Capture / Upload Crop Quality Inspection Photo</span>
-                          <p className="text-[11px] text-[#065f46]">Photo will be timestamped and saved to the consignment audit record.</p>
-                          
-                          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#065f46] hover:bg-[#10b981] text-white text-xs font-black cursor-pointer transition-all shadow-xs">
-                            <Upload className="w-4 h-4" />
-                            <span>Upload / Capture Photo</span>
-                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                          </label>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={handleVerifyQualityAndPickup}
-                        className="w-full py-4 rounded-2xl bg-[#065f46] hover:bg-[#10b981] text-white font-black text-xs shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-                      >
-                        <ShieldCheck className="w-5 h-5 text-[#a7f3d0]" />
-                        <span>VERIFY CROP QUALITY & CONFIRM PICKUP</span>
-                      </button>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Quality Verification Badge (If Completed) */}
                   {activeDelivery.qualityVerification && (
@@ -629,17 +624,17 @@ export const TransporterDashboard: React.FC = () => {
                         className="w-full py-4 rounded-2xl bg-[#10b981] hover:bg-[#047857] text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 border border-white/30 cursor-pointer"
                       >
                         <Play className="w-5 h-5" />
-                        <span>START DELIVERY (IN TRANSIT)</span>
+                        <span>{t('transporter.startDeliveryBtn', 'START DELIVERY (IN TRANSIT)')}</span>
                       </button>
                     )}
 
                     {activeDelivery.status === 'IN_TRANSIT' && (
                       <button
-                        onClick={() => handleUpdateStatus('DELIVERED')}
+                        onClick={() => setVerificationModal({ isOpen: true, mode: 'DELIVERY_OTP' })}
                         className="w-full py-4 rounded-2xl bg-[#022c22] hover:bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 border border-[#10b981]/40 cursor-pointer"
                       >
                         <CheckCircle2 className="w-5 h-5 text-[#10b981]" />
-                        <span>MARK AS DELIVERED</span>
+                        <span>{t('otp.enterDeliveryOtpBtn', 'ENTER BUYER DELIVERY OTP & COMPLETE')}</span>
                       </button>
                     )}
 

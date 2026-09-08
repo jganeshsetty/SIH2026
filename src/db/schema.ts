@@ -22,9 +22,9 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   phone: text("phone"),
   address: text("address"),
-  preferredLanguage: text("preferred_language").default("en"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
 
 /** Farmer Crop Harvest Listings Table */
 export const crops = pgTable("crops", {
@@ -101,6 +101,8 @@ export const transportRequests = pgTable("transport_requests", {
   unit: text("unit").default("kg"),
   farmerName: text("farmer_name"),
   buyerName: text("buyer_name"),
+  farmerId: integer("farmer_id").references(() => users.id),
+  buyerId: integer("buyer_id").references(() => users.id),
   pickupLocation: text("pickup_location").notNull(),
   dropLocation: text("drop_location").notNull(),
   pathType: text("path_type").default("Farmer → Buyer"), // Farmer → Buyer, Farmer → FPO, Farmer → Storehouse
@@ -110,11 +112,64 @@ export const transportRequests = pgTable("transport_requests", {
   pickupLng: doublePrecision("pickup_lng"),
   dropLat: doublePrecision("drop_lat"),
   dropLng: doublePrecision("drop_lng"),
+  pickupOtp: text("pickup_otp"),
+  deliveryOtp: text("delivery_otp"),
+  pickupOtpVerified: boolean("pickup_otp_verified").default(false),
+  deliveryOtpVerified: boolean("delivery_otp_verified").default(false),
+  qualityGrade: text("quality_grade"),
+  qualityQuantity: doublePrecision("quality_quantity"),
+  visibleDamage: text("visible_damage"),
+  qualityRemarks: text("quality_remarks"),
   cropPhotoUrl: text("crop_photo_url"),
   qualityVerified: boolean("quality_verified").default(false),
   verificationDetails: text("verification_details"),
   verificationTimestamp: timestamp("verification_timestamp"),
   status: text("status").default("AVAILABLE"), // AVAILABLE, ACCEPTED, DRIVER_ASSIGNED, PICKUP_STARTED, QUALITY_VERIFIED, PICKED_UP, IN_TRANSIT, ARRIVED, DELIVERED, COMPLETED
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** Razorpay Payments Table */
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id)
+    .notNull(),
+  orderId: integer("order_id"),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  transportRequestId: integer("transport_request_id").references(() => transportRequests.id),
+  razorpayOrderId: text("razorpay_order_id").notNull(),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  razorpaySignature: text("razorpay_signature"),
+  amount: doublePrecision("amount").notNull(),
+  currency: text("currency").default("INR").notNull(),
+  paymentMethod: text("payment_method").default("UPI").notNull(),
+  paymentStatus: text("payment_status").default("CREATED").notNull(), // CREATED, PENDING, PROCESSING, SUCCESS, FAILED, REFUNDED, CANCELLED
+  failureReason: text("failure_reason"),
+  payerName: text("payer_name"),
+  receiverName: text("receiver_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Tax & Invoice Records Table */
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  paymentId: integer("payment_id")
+    .references(() => payments.id)
+    .notNull(),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  gstin: text("gstin"),
+  sellerName: text("seller_name").notNull(),
+  sellerGstin: text("seller_gstin"),
+  buyerName: text("buyer_name").notNull(),
+  buyerGstin: text("buyer_gstin"),
+  taxableAmount: doublePrecision("taxable_amount").notNull(),
+  cgst: doublePrecision("cgst").default(0).notNull(),
+  sgst: doublePrecision("sgst").default(0).notNull(),
+  igst: doublePrecision("igst").default(0).notNull(),
+  totalTax: doublePrecision("total_tax").default(0).notNull(),
+  totalAmount: doublePrecision("total_amount").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -427,3 +482,31 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     relationName: "receivedMessages",
   }),
 }));
+
+export const paymentsRelations = relations(payments, ({ one, many }) => ({
+  user: one(users, {
+    fields: [payments.userId],
+    references: [users.id],
+  }),
+  transaction: one(transactions, {
+    fields: [payments.transactionId],
+    references: [transactions.id],
+  }),
+  transportRequest: one(transportRequests, {
+    fields: [payments.transportRequestId],
+    references: [transportRequests.id],
+  }),
+  invoices: many(invoices),
+}));
+
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  payment: one(payments, {
+    fields: [invoices.paymentId],
+    references: [payments.id],
+  }),
+  transaction: one(transactions, {
+    fields: [invoices.transactionId],
+    references: [transactions.id],
+  }),
+}));
+

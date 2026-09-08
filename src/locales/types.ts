@@ -283,4 +283,32 @@ export interface TranslationsSchema {
     confirmNo: string;
     voiceUnsupported: string;
   };
+  payment?: {
+    payNow?: string;
+    razorpayTitle?: string;
+    razorpaySubtitle?: string;
+    upiMethod?: string;
+    confirmPayment?: string;
+    paymentSuccess?: string;
+    paymentFailed?: string;
+    downloadInvoice?: string;
+    gstDetails?: string;
+    taxableAmount?: string;
+    cgst?: string;
+    sgst?: string;
+    igst?: string;
+    totalTax?: string;
+    invoiceNumber?: string;
+    transactionHistory?: string;
+  };
+  otp?: {
+    pickupOtp?: string;
+    deliveryOtp?: string;
+    enterPickupOtp?: string;
+    enterDeliveryOtp?: string;
+    verifyOtp?: string;
+    otpSuccess?: string;
+    otpError?: string;
+  };
 }
+

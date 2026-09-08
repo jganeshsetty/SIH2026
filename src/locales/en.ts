@@ -273,5 +273,33 @@ export const en: TranslationsSchema = {
     confirmYes: 'Yes, Confirm',
     confirmNo: 'Cancel',
     voiceUnsupported: 'Speech recognition is not supported in this browser. You can type your request below.'
+  },
+  payment: {
+    payNow: 'Pay Now with Razorpay UPI',
+    razorpayTitle: 'Razorpay Secure Escrow Checkout',
+    razorpaySubtitle: 'Instant 100% verified settlement via Razorpay UPI & Netbanking',
+    upiMethod: 'Razorpay UPI Payment',
+    confirmPayment: 'Complete Razorpay Payment',
+    paymentSuccess: 'Payment Verified & Settled Successfully',
+    paymentFailed: 'Payment Failed or Cancelled. Please Retry.',
+    downloadInvoice: 'Tax Invoice (GST)',
+    gstDetails: 'GST Transaction Summary',
+    taxableAmount: 'Taxable Base Amount',
+    cgst: 'CGST (2.5%)',
+    sgst: 'SGST (2.5%)',
+    igst: 'IGST (0%)',
+    totalTax: 'Total GST Tax',
+    invoiceNumber: 'Tax Invoice #',
+    transactionHistory: 'Verified Escrow Transactions & Invoices'
+  },
+  otp: {
+    pickupOtp: 'Farm Pickup OTP Code',
+    deliveryOtp: 'Buyer Delivery OTP Code',
+    enterPickupOtp: 'Enter Farmer 4-Digit Pickup OTP',
+    enterDeliveryOtp: 'Enter Buyer 4-Digit Delivery OTP',
+    verifyOtp: 'Verify OTP & Authorize Handover',
+    otpSuccess: 'OTP Verification Successful',
+    otpError: 'Incorrect OTP code. Please re-check with counterparty.'
   }
 };
+
